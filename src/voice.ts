@@ -15,7 +15,11 @@ import { encodeWav, reconstructAlignments } from "./audio.js";
 const DEFAULT_ORT_VERSION = "1.20.1";
 
 function defaultWasmPaths(): string {
-  return `https://cdn.jsdelivr.net/npm/onnxruntime-web@${DEFAULT_ORT_VERSION}/dist/`;
+  // Match the WASM version to the onnxruntime-web JS that's actually loaded.
+  // Hardcoding a version mismatches the consumer's installed JS glue and throws
+  // "t.getValue is not a function" (the glue and wasm export different symbols).
+  const version = ort.env?.versions?.web ?? DEFAULT_ORT_VERSION;
+  return `https://cdn.jsdelivr.net/npm/onnxruntime-web@${version}/dist/`;
 }
 
 function hfUrl(base: string, repo: string, file: string): string {
