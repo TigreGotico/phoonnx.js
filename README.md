@@ -17,8 +17,10 @@ Live demo: [tigregotico.pt/demo](https://tigregotico.pt/demo)
 
 ## Install
 
+Installed straight from GitHub (not published to npm):
+
 ```bash
-npm install phoonnx onnxruntime-web
+npm install github:TigreGotico/phoonnx.js onnxruntime-web
 ```
 
 ---
