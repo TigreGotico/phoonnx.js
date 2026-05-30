@@ -37,6 +37,7 @@ export async function loadVoice(
     numThreads = 1,
     onProgress,
     hfBase = "https://huggingface.co",
+    webgpu = false,
   } = options;
 
   ort.env.wasm.wasmPaths = wasmPaths;
@@ -53,14 +54,24 @@ export async function loadVoice(
   );
   onProgress?.(1, "initializing");
 
+  // WASM (single-threaded) is the reliable default for these VITS models:
+  // onnxruntime-web's WebGPU EP does not support every VITS op and can create a
+  // session that then fails — or returns silence — at run time. Opt in to GPU
+  // with { webgpu: true }; it still falls back to WASM if GPU init throws.
   let session: ort.InferenceSession;
   let provider = "wasm";
-  try {
-    session = await ort.InferenceSession.create(onnxBuf, {
-      executionProviders: ["webgpu"],
-    });
-    provider = "webgpu";
-  } catch {
+  if (webgpu) {
+    try {
+      session = await ort.InferenceSession.create(onnxBuf, {
+        executionProviders: ["webgpu"],
+      });
+      provider = "webgpu";
+    } catch {
+      session = await ort.InferenceSession.create(onnxBuf, {
+        executionProviders: ["wasm"],
+      });
+    }
+  } else {
     session = await ort.InferenceSession.create(onnxBuf, {
       executionProviders: ["wasm"],
     });

@@ -2,7 +2,16 @@
   "name": "phoonnx",
   "version": "0.1.0",
   "description": "In-browser VITS TTS inference with onnxruntime-web. Unicode and espeak-ng phonemizer paths. No server, no API.",
-  "keywords": ["tts", "text-to-speech", "onnx", "vits", "piper", "espeak", "browser", "wasm"],
+  "keywords": [
+    "tts",
+    "text-to-speech",
+    "onnx",
+    "vits",
+    "piper",
+    "espeak",
+    "browser",
+    "wasm"
+  ],
   "license": "Apache-2.0",
   "author": "TigreGóticoLda",
   "repository": {
@@ -31,17 +40,24 @@
       "require": "./dist/espeak.cjs"
     }
   },
-  "files": ["dist", "README.md", "LICENSE"],
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
     "build": "tsup",
     "dev": "tsup --watch",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "prepare": "tsup"
   },
   "peerDependencies": {
     "onnxruntime-web": ">=1.18.0"
   },
   "peerDependenciesMeta": {
-    "onnxruntime-web": { "optional": false }
+    "onnxruntime-web": {
+      "optional": false
+    }
   },
   "devDependencies": {
     "onnxruntime-web": "^1.20.1",
