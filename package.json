@@ -1,0 +1,51 @@
+{
+  "name": "phoonnx",
+  "version": "0.1.0",
+  "description": "In-browser VITS TTS inference with onnxruntime-web. Unicode and espeak-ng phonemizer paths. No server, no API.",
+  "keywords": ["tts", "text-to-speech", "onnx", "vits", "piper", "espeak", "browser", "wasm"],
+  "license": "Apache-2.0",
+  "author": "TigreGóticoLda",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/TigreGotico/phoonnx.js.git"
+  },
+  "homepage": "https://tigregotico.pt/demo",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    },
+    "./voices": {
+      "types": "./dist/voices.d.ts",
+      "import": "./dist/voices.js",
+      "require": "./dist/voices.cjs"
+    },
+    "./espeak": {
+      "types": "./dist/espeak.d.ts",
+      "import": "./dist/espeak.js",
+      "require": "./dist/espeak.cjs"
+    }
+  },
+  "files": ["dist", "README.md", "LICENSE"],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "typecheck": "tsc --noEmit"
+  },
+  "peerDependencies": {
+    "onnxruntime-web": ">=1.18.0"
+  },
+  "peerDependenciesMeta": {
+    "onnxruntime-web": { "optional": false }
+  },
+  "devDependencies": {
+    "onnxruntime-web": "^1.20.1",
+    "tsup": "^8.0.0",
+    "typescript": "^5.4.0"
+  }
+}

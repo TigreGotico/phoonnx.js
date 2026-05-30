@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>phoonnx.js — browser demo</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 600px; margin: 2rem auto; padding: 0 1rem; }
+    select, textarea, button { display: block; width: 100%; margin-bottom: 1rem; padding: .5rem; font-size: 1rem; }
+    #status { color: #666; font-size: .9rem; min-height: 1.4em; }
+    audio { width: 100%; margin-top: 1rem; }
+  </style>
+</head>
+<body>
+  <h1>phoonnx.js</h1>
+  <p>In-browser VITS TTS — no server, no API.</p>
+
+  <label>Voice
+    <select id="voice"></select>
+  </label>
+
+  <label>Text
+    <textarea id="text" rows="3"></textarea>
+  </label>
+
+  <button id="synth">Synthesize</button>
+  <div id="status"></div>
+  <audio id="player" controls hidden></audio>
+
+  <script type="module">
+    // In a real project: import from "phoonnx" and "phoonnx/voices"
+    // Here we import the built dist directly for the example.
+    import { loadVoice, synthesizeWav } from "../../dist/index.js";
+    import { voices } from "../../dist/voices.js";
+
+    const sel = document.getElementById("voice");
+    const textEl = document.getElementById("text");
+    const btn = document.getElementById("synth");
+    const status = document.getElementById("status");
+    const player = document.getElementById("player");
+
+    // Populate voice dropdown
+    for (const v of voices) {
+      const opt = document.createElement("option");
+      opt.value = v.id;
+      opt.textContent = `${v.voice} — ${v.langLabel}${v.phonemeType === "espeak" ? " (espeak)" : ""}`;
+      sel.append(opt);
+    }
+
+    // Prefill sample text
+    const byId = new Map(voices.map((v) => [v.id, v]));
+    const prefill = () => { textEl.value = byId.get(sel.value)?.sampleText ?? ""; };
+    sel.addEventListener("change", prefill);
+    prefill();
+
+    const cache = new Map();
+
+    btn.addEventListener("click", async () => {
+      const entry = byId.get(sel.value);
+      if (!entry) return;
+      const text = textEl.value.trim();
+      if (!text) return;
+
+      btn.disabled = true;
+      try {
+        let voice = cache.get(entry.id);
+        if (!voice) {
+          voice = await loadVoice(entry, {
+            onProgress: (frac, label) => {
+              status.textContent = frac ? `${label} — ${Math.round(frac * 100)}%` : label;
+            },
+          });
+          cache.set(entry.id, voice);
+        }
+        status.textContent = "synthesizing…";
+
+        // espeak voices need an explicit tokenizer — skip them in this minimal example
+        if (entry.phonemeType !== "unicode") {
+          status.textContent = "espeak voices need the espeak-ng WASM tokenizer (see espeak example)";
+          return;
+        }
+
+        const blob = await synthesizeWav(voice, text);
+        player.src = URL.createObjectURL(blob);
+        player.hidden = false;
+        player.play().catch(() => {});
+        status.textContent = `done — ${voice.provider}`;
+      } catch (err) {
+        status.textContent = err.message;
+      } finally {
+        btn.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>
