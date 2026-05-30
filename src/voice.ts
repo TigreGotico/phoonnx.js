@@ -22,7 +22,27 @@ function hfUrl(base: string, repo: string, file: string): string {
   return `${base}/${repo}/resolve/main/${file}`;
 }
 
-/** Tiny inference to confirm an execution provider can actually run this op graph. */
+/**
+ * Read an output tensor's float32 data, EP-agnostically. WebGPU outputs may live
+ * in a GPU buffer (location "gpu-buffer"); those must be downloaded with
+ * getData(). WASM/CPU tensors expose `.data` directly.
+ */
+async function readFloat32(tensor: ort.Tensor): Promise<Float32Array> {
+  const t = tensor as ort.Tensor & {
+    location?: string;
+    getData?: (release?: boolean) => Promise<unknown>;
+  };
+  if (t.location && t.location !== "cpu" && typeof t.getData === "function") {
+    return (await t.getData(true)) as Float32Array;
+  }
+  return tensor.data as Float32Array;
+}
+
+/**
+ * Tiny inference to confirm an execution provider can run this op graph AND that
+ * its output can be read back (the WebGPU EP can pass create+run but fail when
+ * the output buffer is read). Any throw here triggers the WASM fallback.
+ */
 async function warmup(session: ort.InferenceSession): Promise<void> {
   const ids = [1, 0, 2];
   const feeds: Record<string, ort.Tensor> = {
@@ -32,7 +52,8 @@ async function warmup(session: ort.InferenceSession): Promise<void> {
   };
   const wanted = new Set(session.inputNames);
   for (const k of Object.keys(feeds)) if (!wanted.has(k)) delete feeds[k];
-  await session.run(feeds);
+  const results = await session.run(feeds);
+  await readFloat32(results[session.outputNames[0]]);
 }
 
 /**
@@ -162,7 +183,7 @@ export async function synthesize(
 
   const results = await voice.session.run(feeds);
   const audioTensor = results[voice.session.outputNames[0]];
-  const samples = audioTensor.data as Float32Array;
+  const samples = await readFloat32(audioTensor);
 
   let alignments: PhonemeAlignment[] | null = null;
   if (includeAlignments && voice.session.outputNames.length > 1) {
