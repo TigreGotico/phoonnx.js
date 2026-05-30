@@ -1,179 +1,155 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🗣️</text></svg>" />
-  <title>phoonnx.js — in-browser TTS demo</title>
-  <style>
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-    :root {
-      --bg: #0d1117;
-      --surface: #161b22;
-      --border: #30363d;
-      --fg: #e6edf3;
-      --muted: #8b949e;
-      --accent: #58a6ff;
-      --accent-bg: rgba(88,166,255,.12);
-      --success: #3fb950;
-      --warning: #d29922;
-      --radius: 8px;
-      --font: system-ui, -apple-system, sans-serif;
-    }
-
-    body {
-      font-family: var(--font);
-      background: var(--bg);
-      color: var(--fg);
-      min-height: 100vh;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      padding: 2rem 1rem 4rem;
-    }
-
-    .container { width: 100%; max-width: 640px; }
-
-    header { text-align: center; margin-bottom: 2.5rem; }
-    header h1 { font-size: 2rem; font-weight: 700; letter-spacing: -.5px; }
-    header h1 span { color: var(--accent); }
-    header p { color: var(--muted); margin-top: .5rem; font-size: .95rem; }
-
-    .card {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 1.25rem 1.5rem;
-    }
-    .card + .card { margin-top: 1rem; }
-
-    label { display: block; font-size: .8rem; font-weight: 600; color: var(--muted);
-            text-transform: uppercase; letter-spacing: .05em; margin-bottom: .4rem; }
-
-    select, textarea {
-      width: 100%; background: var(--bg); border: 1px solid var(--border);
-      border-radius: var(--radius); color: var(--fg); font-family: var(--font);
-      font-size: .95rem; padding: .5rem .75rem; outline: none;
-      transition: border-color .15s;
-    }
-    select:focus, textarea:focus { border-color: var(--accent); }
-    textarea { resize: vertical; min-height: 4.5rem; }
-
-    .row { display: flex; gap: .75rem; align-items: center; margin-top: 1rem; flex-wrap: wrap; }
-
-    button {
-      background: var(--accent); color: #000; font-weight: 700;
-      border: none; border-radius: var(--radius); padding: .55rem 1.2rem;
-      font-size: .95rem; cursor: pointer; transition: opacity .15s;
-      white-space: nowrap;
-    }
-    button:disabled { opacity: .45; cursor: not-allowed; }
-    button.secondary {
-      background: transparent; color: var(--accent);
-      border: 1px solid var(--accent);
-    }
-
-    #status {
-      font-size: .85rem; color: var(--muted); flex: 1; min-width: 0;
-      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-    }
-    #status.error { color: #f85149; }
-
-    .progress {
-      height: 3px; background: var(--border); border-radius: 2px;
-      margin-top: .75rem; overflow: hidden; display: none;
-    }
-    .progress-bar {
-      height: 100%; background: var(--accent); border-radius: 2px;
-      transition: width .1s; width: 0%;
-    }
-
-    audio { width: 100%; margin-top: 1rem; accent-color: var(--accent); }
-
-    .actions { display: flex; gap: .5rem; margin-top: .75rem; flex-wrap: wrap; }
-
-    .badge {
-      display: inline-block; font-size: .72rem; font-weight: 600; padding: .15rem .5rem;
-      border-radius: 20px; border: 1px solid var(--border); color: var(--muted);
-    }
-    .badge.gpu { border-color: var(--success); color: var(--success); }
-    .badge.ha  { border-color: var(--warning); color: var(--warning); }
-    .badge.espeak { border-color: var(--accent); color: var(--accent); }
-
-    .info-card p { color: var(--muted); font-size: .875rem; line-height: 1.6; }
-    .info-card p + p { margin-top: .5rem; }
-    .info-card a { color: var(--accent); text-decoration: none; }
-    .info-card a:hover { text-decoration: underline; }
-    .info-card strong { color: var(--fg); }
-
-    footer { margin-top: 2.5rem; text-align: center; color: var(--muted); font-size: .8rem; }
-    footer a { color: var(--accent); text-decoration: none; }
-
-    #result { display: none; }
-  </style>
-</head>
-<body>
-  <div class="container">
-    <header>
-      <h1><span>phoonnx</span>.js</h1>
-      <p>In-browser VITS TTS — no server, no API, fully private.</p>
-    </header>
-
-    <div class="card">
-      <label for="voice">Voice</label>
-      <select id="voice"></select>
-
-      <div id="voice-badges" style="margin-top:.5rem;display:flex;gap:.4rem;flex-wrap:wrap;"></div>
-
-      <label for="text" style="margin-top:1rem;">Text</label>
-      <textarea id="text" placeholder="Type something…"></textarea>
-
-      <div class="progress" id="progress-wrap">
-        <div class="progress-bar" id="progress-bar"></div>
+<!doctype html>
+<html lang="en" class="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>phoonnx — Voices Demo (Miro &amp; Dii)</title>
+    <meta
+      name="description"
+      content="In-browser TTS demo for the phoonnx Miro & Dii voices. Speech is synthesized entirely in your browser with onnxruntime-web — no server, no API."
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600&family=Inter:wght@400;500;600;700&family=Playfair+Display:wght@600;700&display=swap"
+      rel="stylesheet"
+    />
+  </head>
+  <body class="min-h-screen">
+    <div class="mx-auto max-w-3xl px-6 py-10">
+      <!-- top bar -->
+      <div class="mb-10 flex items-center justify-between">
+        <a href="https://github.com/TigreGotico/phoonnx.js" rel="noopener"
+          class="font-display text-sm font-semibold tracking-wide text-gradient">phoonnx.js</a>
+        <button id="theme-toggle" type="button"
+          class="rounded-lg border border-border bg-surface/60 px-3 py-1.5 text-sm text-muted hover:text-primary"
+          aria-label="Toggle theme">🌓</button>
       </div>
 
-      <div class="row">
-        <button id="synth">Synthesize</button>
-        <span id="status"></span>
+      <!-- header band -->
+      <header class="mb-12">
+        <p class="eyebrow mb-4">Try it in your browser</p>
+        <h1 class="display-2">Speak with Miro &amp; Dii</h1>
+        <p class="mt-4 max-w-2xl text-lg leading-relaxed text-fg/85">
+          Pick a voice, type a sentence, and hear it. Each voice is a tiny
+          ~15.6M-parameter model, downloaded straight from Hugging Face and run
+          entirely in your browser with onnxruntime-web — nothing is sent to a server.
+        </p>
+        <hr class="mt-8 h-px border-0" style="background: linear-gradient(to right, transparent, rgb(var(--grad-via) / 0.4), transparent);" />
+      </header>
+
+      <!-- preview banner -->
+      <div class="mb-6 rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm" role="note">
+        <strong>Preview models.</strong> These voices are a work in progress — they are
+        still being trained and do <strong>not</strong> represent the final quality.
+        Expect rough edges; they will keep improving.
       </div>
 
-      <div id="result">
-        <audio id="player" controls></audio>
-        <div class="actions">
-          <a id="download" class="btn" download="phoonnx.wav">
-            <button class="secondary">Download .wav</button>
-          </a>
-          <span id="provider-badge" class="badge"></span>
+      <!-- controls -->
+      <div class="card">
+        <label class="eyebrow mb-2 block" for="voice">Voice</label>
+        <select id="voice" class="w-full rounded-lg border border-border bg-elevated px-3 py-2 text-fg"></select>
+
+        <label class="eyebrow mb-2 mt-5 block" for="text">Text</label>
+        <textarea id="text" rows="3" class="w-full rounded-lg border border-border bg-elevated px-3 py-2 text-fg"></textarea>
+
+        <div class="mt-5 grid gap-4 sm:grid-cols-2">
+          <label class="block text-sm">
+            <span class="mb-1 flex justify-between text-muted"><span>Speed</span><span id="speedVal" class="tabular-nums">1.00×</span></span>
+            <input id="speed" type="range" min="0.5" max="2" step="0.05" value="1" class="w-full accent-primary" />
+          </label>
+          <label class="block text-sm">
+            <span class="mb-1 flex justify-between text-muted"><span>Volume</span><span id="volumeVal" class="tabular-nums">100%</span></span>
+            <input id="volume" type="range" min="0" max="2" step="0.05" value="1" class="w-full accent-primary" />
+          </label>
+        </div>
+
+        <details class="mt-3 text-sm">
+          <summary class="cursor-pointer text-muted hover:text-fg">Advanced (piper inference)</summary>
+          <div class="mt-3 grid gap-4 sm:grid-cols-2">
+            <label class="block">
+              <span class="mb-1 flex justify-between text-muted"><span>Variation (noise_scale)</span><span id="noiseVal" class="tabular-nums">0.667</span></span>
+              <input id="noise" type="range" min="0" max="1" step="0.01" value="0.667" class="w-full accent-primary" />
+            </label>
+            <label class="block">
+              <span class="mb-1 flex justify-between text-muted"><span>Phoneme width (noise_w)</span><span id="noisewVal" class="tabular-nums">0.800</span></span>
+              <input id="noisew" type="range" min="0" max="1" step="0.01" value="0.8" class="w-full accent-primary" />
+            </label>
+          </div>
+          <button id="reset" type="button" class="btn-ghost mt-3 text-xs">Reset to defaults</button>
+        </details>
+
+        <div class="mt-5 flex flex-wrap items-center gap-3">
+          <button id="synth" class="btn btn-primary">Synthesize</button>
+          <span id="status" class="text-sm text-muted" aria-live="polite"></span>
+        </div>
+
+        <div id="result" class="mt-5 hidden">
+          <audio id="player" controls class="w-full"></audio>
+          <a id="download" class="btn btn-ghost mt-3 inline-block" download="voice.wav">Download .wav</a>
         </div>
       </div>
+
+      <div class="card mt-6 text-sm">
+        <p class="display-3 text-base">Tiny models — runs on a potato 🥔</p>
+        <p class="mt-2 text-muted">
+          Each voice is a <strong>~15.6&nbsp;million-parameter</strong> model — small
+          enough to run on a Raspberry&nbsp;Pi, a phone, or the very browser tab you're
+          in right now, fully offline, no cloud. While the big TTS labs brag about
+          <em>billions</em> of parameters, we optimize for the opposite:
+          <strong>tiny, fast, private, on-device</strong> voices that anyone can run and own.
+        </p>
+      </div>
+
+      <div class="card mt-6 text-sm">
+        <p class="display-3 text-base">Runs in your smart home</p>
+        <p class="mt-2 text-muted">
+          The eSpeak voices are <strong>piper / Home Assistant compatible</strong> — the
+          exact <code>.onnx</code> you just heard drops into the
+          <a class="text-primary hover:underline" href="https://www.home-assistant.io/voice_control/" rel="noopener">Home Assistant</a>
+          piper add-on. One voice identity, on the web and on your local voice assistant.
+        </p>
+        <p class="mt-2 text-muted">
+          First synthesis of a voice downloads its model (~63 MB) from Hugging Face and
+          caches it; later runs are instant and fully offline.
+        </p>
+      </div>
+
+      <div class="card mt-6 text-sm">
+        <p class="display-3 text-base">An OpenVoiceOS collaboration</p>
+        <p class="mt-2 text-muted">
+          Miro &amp; Dii are built with
+          <a class="text-primary hover:underline" href="https://www.openvoiceos.org" rel="noopener">OpenVoiceOS</a>,
+          the community non-profit voice platform — a collaboration in progress. The
+          models are published openly on
+          <a class="text-primary hover:underline" href="https://huggingface.co/collections/TigreGotico/phoonnx-tts-models" rel="noopener">Hugging Face</a>
+          and run on the
+          <a class="text-primary hover:underline" href="https://github.com/TigreGotico/phoonnx" rel="noopener">phoonnx</a>
+          engine. Everything here is FOSS and self-hostable.
+        </p>
+      </div>
+
+      <div class="card mt-6 text-sm">
+        <p class="display-3 text-base">Open source — train your own voice</p>
+        <p class="mt-2 text-muted">
+          <a class="text-primary hover:underline" href="https://github.com/TigreGotico/phoonnx" rel="noopener">phoonnx</a>
+          is fully open source, <strong>including the training code</strong> (see its
+          <a class="text-primary hover:underline" href="https://github.com/TigreGotico/phoonnx/blob/dev/TRAINING.md" rel="noopener">TRAINING.md</a>).
+          No gatekeeping, no API keys — the goal is to <strong>democratize text-to-speech
+          for everyone</strong>, especially low-resource and minority languages. Build
+          datasets and train your own voices with our
+          <a class="text-primary hover:underline" href="https://github.com/TigreGotico/ml-notebooks" rel="noopener">ml-notebooks</a>.
+        </p>
+      </div>
+
+      <footer class="mt-10 border-t border-border pt-6 text-sm text-muted">
+        Powered by
+        <a class="text-primary hover:underline" href="https://github.com/TigreGotico/phoonnx.js" rel="noopener"><code>phoonnx.js</code></a>
+        — in-browser VITS TTS with onnxruntime-web.
+        <code class="ml-1">npm i github:TigreGotico/phoonnx.js onnxruntime-web</code>
+      </footer>
     </div>
 
-    <div class="card info-card" style="margin-top:1rem;">
-      <p>
-        <strong>How it works:</strong> the voice model is downloaded once from
-        <a href="https://huggingface.co/OpenVoiceOS" rel="noopener">HuggingFace</a>
-        and cached in your browser — later runs are instant and fully offline.
-        Speech is synthesized with
-        <a href="https://onnxruntime.ai" rel="noopener">onnxruntime-web</a>
-        (WebGPU if your browser supports it, WASM otherwise).
-      </p>
-      <p>
-        <strong>eSpeak voices</strong> are
-        <a href="https://www.home-assistant.io/voice_control/" rel="noopener">piper / Home Assistant</a>
-        compatible — the same <code>.onnx</code> drops straight into the piper add-on.
-      </p>
-    </div>
-
-    <footer>
-      <a href="https://github.com/TigreGotico/phoonnx.js" rel="noopener">phoonnx.js on GitHub</a>
-      ·
-      <a href="https://github.com/TigreGotico/phoonnx" rel="noopener">Python library</a>
-      ·
-      <a href="https://tigregotico.pt" rel="noopener">TigreGóticoLda</a>
-    </footer>
-  </div>
-
-  <script type="module" src="/src/main.ts"></script>
-</body>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
 </html>

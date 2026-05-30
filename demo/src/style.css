@@ -1,0 +1,105 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    color-scheme: light dark;
+    /* Light theme — warm off-white, near-black ink. */
+    --color-bg: 250 248 246;
+    --color-surface: 255 255 255;
+    --color-elevated: 255 253 252;
+    --color-fg: 26 22 30;
+    --color-muted: 88 82 96;
+    --color-border: 226 220 228;
+    --color-primary: 180 83 9;
+    --color-primary-fg: 26 20 10;
+    --color-accent: 217 119 6;
+
+    --grad-from: 245 158 11;
+    --grad-via: 217 119 6;
+    --grad-to: 180 83 9;
+    --gradient-brand: linear-gradient(120deg, rgb(var(--grad-from)), rgb(var(--grad-via)) 45%, rgb(var(--grad-to)));
+    --gradient-brand-soft: linear-gradient(120deg, rgb(var(--grad-from) / 0.16), rgb(var(--grad-to) / 0.16));
+    --shadow-elevate: 0 1px 2px rgb(20 12 28 / 0.06), 0 12px 32px -16px rgb(20 12 28 / 0.18);
+    --shadow-glow: 0 0 0 1px rgb(var(--grad-via) / 0.18), 0 18px 48px -20px rgb(var(--grad-via) / 0.45);
+  }
+
+  :root.dark {
+    /* Dark theme — warm near-black, gold ink. */
+    --color-bg: 13 12 10;
+    --color-surface: 23 21 17;
+    --color-elevated: 32 28 22;
+    --color-fg: 245 242 236;
+    --color-muted: 176 168 152;
+    --color-border: 52 46 36;
+    --color-primary: 251 191 36;
+    --color-primary-fg: 26 20 10;
+    --color-accent: 245 158 11;
+    --grad-from: 251 191 36;
+    --grad-via: 245 158 11;
+    --grad-to: 180 83 9;
+    --shadow-elevate: 0 1px 2px rgb(0 0 0 / 0.5), 0 16px 40px -18px rgb(0 0 0 / 0.7);
+    --shadow-glow: 0 0 0 1px rgb(var(--grad-via) / 0.3), 0 24px 60px -24px rgb(var(--grad-via) / 0.55);
+  }
+
+  html { scroll-behavior: smooth; }
+  body {
+    @apply bg-bg text-fg font-sans antialiased;
+    background-image:
+      radial-gradient(46% 38% at 82% -4%, rgb(var(--grad-to) / 0.1), transparent 60%),
+      radial-gradient(50% 42% at -6% 8%, rgb(var(--grad-from) / 0.1), transparent 60%);
+    background-attachment: fixed;
+    background-repeat: no-repeat;
+  }
+  h1, h2, h3 { @apply font-serif; letter-spacing: -0.012em; }
+  ::selection { background: rgb(var(--grad-via) / 0.28); }
+  :focus-visible { @apply outline-none ring-2 ring-primary ring-offset-2 ring-offset-bg; }
+}
+
+@layer components {
+  .btn {
+    @apply relative inline-flex items-center justify-center gap-2 rounded-lg px-5 py-2.5 text-sm font-semibold transition-all duration-200;
+  }
+  .btn-primary {
+    @apply btn text-primary-fg;
+    background: var(--gradient-brand);
+    background-size: 160% 160%;
+    box-shadow: var(--shadow-glow);
+  }
+  .btn-primary:hover { background-position: 100% 0; transform: translateY(-1px); }
+  .btn-primary:disabled { opacity: 0.6; cursor: default; transform: none; }
+  .btn-ghost { @apply btn border border-border bg-surface/60 text-fg backdrop-blur; }
+  .btn-ghost:hover { @apply border-primary/60 text-primary; transform: translateY(-1px); }
+
+  .card {
+    @apply relative rounded-2xl border border-border bg-surface p-6;
+    box-shadow: var(--shadow-elevate);
+  }
+
+  .badge {
+    @apply inline-block rounded-full border border-border px-2.5 py-0.5 text-xs text-muted;
+  }
+  .badge-accent {
+    @apply inline-block rounded-full px-2.5 py-0.5 text-xs font-medium text-primary;
+    background: var(--gradient-brand-soft);
+    border: 1px solid rgb(var(--grad-via) / 0.25);
+  }
+
+  .eyebrow {
+    @apply inline-flex items-center gap-2 font-display text-xs font-semibold uppercase tracking-[0.28em];
+    color: rgb(var(--color-primary));
+  }
+  .eyebrow::before { content: ''; @apply h-px w-6; background: var(--gradient-brand); }
+
+  .text-gradient {
+    background: var(--gradient-brand);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  .display-1 { @apply font-serif font-bold; font-size: clamp(2.5rem, 1.6rem + 4.2vw, 4.5rem); line-height: 1.02; letter-spacing: -0.02em; }
+  .display-2 { @apply font-serif font-semibold; font-size: clamp(1.9rem, 1.3rem + 2.6vw, 3rem); line-height: 1.08; letter-spacing: -0.018em; }
+  .display-3 { @apply font-serif font-semibold; font-size: clamp(1.4rem, 1.1rem + 1.3vw, 2rem); line-height: 1.15; }
+}

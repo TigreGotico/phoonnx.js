@@ -22,6 +22,19 @@ function hfUrl(base: string, repo: string, file: string): string {
   return `${base}/${repo}/resolve/main/${file}`;
 }
 
+/** Tiny inference to confirm an execution provider can actually run this op graph. */
+async function warmup(session: ort.InferenceSession): Promise<void> {
+  const ids = [1, 0, 2];
+  const feeds: Record<string, ort.Tensor> = {
+    input: new ort.Tensor("int64", BigInt64Array.from(ids, BigInt), [1, ids.length]),
+    input_lengths: new ort.Tensor("int64", BigInt64Array.from([BigInt(ids.length)]), [1]),
+    scales: new ort.Tensor("float32", Float32Array.from([0.667, 1, 0.8]), [3]),
+  };
+  const wanted = new Set(session.inputNames);
+  for (const k of Object.keys(feeds)) if (!wanted.has(k)) delete feeds[k];
+  await session.run(feeds);
+}
+
 /**
  * Download, cache, and initialize a phoonnx voice.
  *
@@ -37,6 +50,7 @@ export async function loadVoice(
     numThreads = 1,
     onProgress,
     hfBase = "https://huggingface.co",
+    webgpu = true,
   } = options;
 
   ort.env.wasm.wasmPaths = wasmPaths;
@@ -53,13 +67,29 @@ export async function loadVoice(
   );
   onProgress?.(1, "initializing");
 
-  // These VITS models are tiny (~15.6M params); single-threaded WASM (CPU) is
-  // plenty and is the only reliable onnxruntime-web backend for them (the
-  // WebGPU EP does not support every VITS op).
-  const session = await ort.InferenceSession.create(onnxBuf, {
-    executionProviders: ["wasm"],
-  });
-  const provider = "wasm";
+  // Try WebGPU (faster), but validate it with a tiny warmup run — the EP can
+  // create a session that then fails or returns silence on an unsupported VITS
+  // op. Any error (create OR run) falls back to single-threaded WASM (CPU).
+  let session: ort.InferenceSession | undefined;
+  let provider = "wasm";
+  if (webgpu) {
+    try {
+      const gpu = await ort.InferenceSession.create(onnxBuf, {
+        executionProviders: ["webgpu"],
+      });
+      await warmup(gpu);
+      session = gpu;
+      provider = "webgpu";
+    } catch {
+      session = undefined;
+    }
+  }
+  if (!session) {
+    session = await ort.InferenceSession.create(onnxBuf, {
+      executionProviders: ["wasm"],
+    });
+    provider = "wasm";
+  }
 
   return {
     entry,

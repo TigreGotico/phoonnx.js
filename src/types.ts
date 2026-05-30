@@ -88,6 +88,12 @@ export interface LoadVoiceOptions {
    * Defaults to "https://huggingface.co". Override for mirrors or proxies.
    */
   hfBase?: string;
+  /**
+   * Try the WebGPU execution provider first (it's faster). Defaults to true.
+   * WebGPU is validated with a warmup run; on any error (create or run) it
+   * falls back to single-threaded WASM. Set false to force WASM/CPU.
+   */
+  webgpu?: boolean;
 }
 
 /** Options for synthesize(). */

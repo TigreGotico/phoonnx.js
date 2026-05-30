@@ -1,143 +1,127 @@
-import { loadVoice, synthesizeWav, type LoadedVoice } from "phoonnx";
+import "./style.css";
+import { loadVoice, synthesize, encodeWav, type LoadedVoice } from "phoonnx";
 import { voices, type VoiceEntry } from "phoonnx/voices";
 import { makeEspeakTokenizer } from "phoonnx/espeak";
-
-// espeak-ng WASM — Vite resolves the ?url to the built asset path
-// @ts-expect-error no types for espeak-ng emscripten module
+// @ts-expect-error — emscripten module ships no types
 import espeakFactory from "espeak-ng";
 import espeakWasmUrl from "espeak-ng/dist/espeak-ng.wasm?url";
 
-// ---------------------------------------------------------------------------
-// DOM refs
-// ---------------------------------------------------------------------------
-const voiceSel   = document.getElementById("voice")         as HTMLSelectElement;
-const badgesEl   = document.getElementById("voice-badges")  as HTMLDivElement;
-const textEl     = document.getElementById("text")          as HTMLTextAreaElement;
-const synthBtn   = document.getElementById("synth")         as HTMLButtonElement;
-const statusEl   = document.getElementById("status")        as HTMLSpanElement;
-const progressWrap = document.getElementById("progress-wrap") as HTMLDivElement;
-const progressBar  = document.getElementById("progress-bar")  as HTMLDivElement;
-const resultEl   = document.getElementById("result")        as HTMLDivElement;
-const playerEl   = document.getElementById("player")        as HTMLAudioElement;
-const downloadEl = document.getElementById("download")      as HTMLAnchorElement;
-const providerBadge = document.getElementById("provider-badge") as HTMLSpanElement;
-
-// ---------------------------------------------------------------------------
-// Build voice dropdown
-// ---------------------------------------------------------------------------
-const byId = new Map<string, VoiceEntry>(voices.map((v) => [v.id, v]));
-
-// Group by speaker
-const groups: Record<string, VoiceEntry[]> = {};
-for (const v of voices) {
-  (groups[v.voice] ??= []).push(v);
-}
-for (const [speaker, items] of Object.entries(groups)) {
-  const og = document.createElement("optgroup");
-  og.label = speaker;
-  for (const v of items) {
-    const opt = document.createElement("option");
-    opt.value = v.id;
-    opt.textContent = v.langLabel;
-    og.append(opt);
-  }
-  voiceSel.append(og);
-}
-
-function updateBadges(entry: VoiceEntry) {
-  badgesEl.innerHTML = "";
-  const add = (text: string, cls?: string) => {
-    const b = document.createElement("span");
-    b.className = "badge" + (cls ? " " + cls : "");
-    b.textContent = text;
-    badgesEl.append(b);
-  };
-  add(entry.lang);
-  if (entry.phonemeType === "espeak") add("eSpeak", "espeak");
-  if (entry.haCompatible) add("Home Assistant compatible", "ha");
-}
-
-function prefill(entry: VoiceEntry) {
-  textEl.value = entry.sampleText;
-  updateBadges(entry);
-}
-
-voiceSel.addEventListener("change", () => {
-  const e = byId.get(voiceSel.value);
-  if (e) prefill(e);
+// ── theme toggle (persisted) ───────────────────────────────────────────────
+const root = document.documentElement;
+if (localStorage.getItem("phoonnx-theme") === "light") root.classList.remove("dark");
+document.getElementById("theme-toggle")!.addEventListener("click", () => {
+  root.classList.toggle("dark");
+  localStorage.setItem("phoonnx-theme", root.classList.contains("dark") ? "dark" : "light");
 });
 
-const first = byId.get(voiceSel.value);
-if (first) prefill(first);
-
-// ---------------------------------------------------------------------------
-// Synthesis
-// ---------------------------------------------------------------------------
-const voiceCache = new Map<string, LoadedVoice>();
-const espeakTokenize = makeEspeakTokenizer(espeakFactory, espeakWasmUrl);
-
-function setStatus(msg: string, isError = false) {
-  statusEl.textContent = msg;
-  statusEl.className = isError ? "error" : "";
-}
-
-function setProgress(frac: number) {
-  if (frac <= 0 || frac >= 1) {
-    progressWrap.style.display = "none";
-  } else {
-    progressWrap.style.display = "block";
-    progressBar.style.width = `${Math.round(frac * 100)}%`;
+// ── voice dropdown: Dii first, then Miro, then extras ──────────────────────
+const VOICE_ORDER: Record<string, number> = { Dii: 0, Miro: 1, "Voice 3": 2, "Voice 4": 3 };
+const VOICE_LABELS: Record<string, string> = { Miro: "Miro (male)", Dii: "Dii (female)" };
+const sorted = [...voices].sort(
+  (a, b) =>
+    (VOICE_ORDER[a.voice] ?? 9) - (VOICE_ORDER[b.voice] ?? 9) ||
+    a.langLabel.localeCompare(b.langLabel),
+);
+const byId = new Map<string, VoiceEntry>(voices.map((v) => [v.id, v]));
+const sel = document.getElementById("voice") as HTMLSelectElement;
+const groupsSeen = new Map<string, HTMLOptGroupElement>();
+for (const v of sorted) {
+  let og = groupsSeen.get(v.voice);
+  if (!og) {
+    og = document.createElement("optgroup");
+    og.label = VOICE_LABELS[v.voice] || v.voice;
+    groupsSeen.set(v.voice, og);
+    sel.append(og);
   }
+  const opt = document.createElement("option");
+  opt.value = v.id;
+  opt.textContent = `${v.langLabel} · ${v.haCompatible ? "eSpeak (Home Assistant)" : "Unicode"}`;
+  og.append(opt);
 }
 
-synthBtn.addEventListener("click", async () => {
-  const entry = byId.get(voiceSel.value);
+// ── refs ───────────────────────────────────────────────────────────────────
+const textEl = document.getElementById("text") as HTMLTextAreaElement;
+const btn = document.getElementById("synth") as HTMLButtonElement;
+const status = document.getElementById("status") as HTMLSpanElement;
+const result = document.getElementById("result") as HTMLDivElement;
+const player = document.getElementById("player") as HTMLAudioElement;
+const download = document.getElementById("download") as HTMLAnchorElement;
+const speed = document.getElementById("speed") as HTMLInputElement;
+const volume = document.getElementById("volume") as HTMLInputElement;
+const noise = document.getElementById("noise") as HTMLInputElement;
+const noisew = document.getElementById("noisew") as HTMLInputElement;
+const reset = document.getElementById("reset") as HTMLButtonElement;
+
+const espeakTokenize = makeEspeakTokenizer(espeakFactory, espeakWasmUrl);
+const cache = new Map<string, LoadedVoice>();
+const DEFAULTS = { speed: "1", volume: "1", noise: "0.667", noisew: "0.8" };
+
+function syncLabels() {
+  (document.getElementById("speedVal") as HTMLElement).textContent = `${(+speed.value).toFixed(2)}×`;
+  (document.getElementById("volumeVal") as HTMLElement).textContent = `${Math.round(+volume.value * 100)}%`;
+  (document.getElementById("noiseVal") as HTMLElement).textContent = (+noise.value).toFixed(3);
+  (document.getElementById("noisewVal") as HTMLElement).textContent = (+noisew.value).toFixed(3);
+}
+for (const el of [speed, volume, noise, noisew]) el.addEventListener("input", syncLabels);
+reset.addEventListener("click", () => {
+  speed.value = DEFAULTS.speed;
+  volume.value = DEFAULTS.volume;
+  noise.value = DEFAULTS.noise;
+  noisew.value = DEFAULTS.noisew;
+  syncLabels();
+});
+syncLabels();
+
+function prefill() {
+  const v = byId.get(sel.value);
+  if (v) textEl.value = v.sampleText;
+}
+sel.addEventListener("change", prefill);
+prefill();
+
+btn.addEventListener("click", async () => {
+  const entry = byId.get(sel.value);
   if (!entry) return;
   const text = textEl.value.trim();
   if (!text) return;
-
-  synthBtn.disabled = true;
-  resultEl.style.display = "none";
-  setProgress(0);
-
+  btn.disabled = true;
   try {
-    let voice = voiceCache.get(entry.id);
-    if (!voice) {
-      setStatus("downloading voice…");
-      voice = await loadVoice(entry, {
-        onProgress(frac, label) {
-          setStatus(label);
-          setProgress(frac);
+    let loaded = cache.get(entry.id);
+    if (!loaded) {
+      status.textContent = "loading voice…";
+      loaded = await loadVoice(entry, {
+        onProgress: (frac, label) => {
+          status.textContent = `${label}${frac ? ` — ${Math.round(frac * 100)}%` : ""}`;
         },
       });
-      voiceCache.set(entry.id, voice);
-      setProgress(1);
+      cache.set(entry.id, loaded);
     }
-
-    setStatus("synthesizing…");
-
+    status.textContent = "synthesizing…";
     const tokenize =
       entry.phonemeType === "espeak"
         ? (t: string, idMap: Record<string, number>) =>
-            espeakTokenize(t, idMap, entry.espeakVoice!)
+            espeakTokenize(t, idMap, entry.espeakVoice ?? undefined)
         : undefined;
-
-    const blob = await synthesizeWav(voice, text, { tokenize });
-
+    const { samples, sampleRate } = await synthesize(loaded, text, {
+      lengthScale: 1 / +speed.value,
+      noiseScale: +noise.value,
+      noiseW: +noisew.value,
+      tokenize,
+    });
+    const vol = +volume.value;
+    const out =
+      vol !== 1 ? Float32Array.from(samples, (s) => Math.max(-1, Math.min(1, s * vol))) : samples;
+    const blob = encodeWav(out, sampleRate);
     const url = URL.createObjectURL(blob);
-    playerEl.src = url;
-    downloadEl.href = url;
-    downloadEl.download = `${entry.id}.wav`;
-    resultEl.style.display = "block";
-    providerBadge.textContent = voice.provider;
-    providerBadge.className = "badge" + (voice.provider === "webgpu" ? " gpu" : "");
-    setStatus(`done · ${voice.provider}`);
-    setProgress(1);
-    playerEl.play().catch(() => {});
+    player.src = url;
+    download.href = url;
+    download.download = `${entry.id}.wav`;
+    result.classList.remove("hidden");
+    status.textContent = `done · ${loaded.provider}`;
+    player.play().catch(() => {});
   } catch (err) {
-    setStatus((err as Error).message || "synthesis failed", true);
-    setProgress(1);
+    status.textContent = (err as Error).message || "synthesis failed";
   } finally {
-    synthBtn.disabled = false;
+    btn.disabled = false;
   }
 });
