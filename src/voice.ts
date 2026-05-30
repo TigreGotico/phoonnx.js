@@ -1,4 +1,4 @@
-import type * as ort from "onnxruntime-web";
+import * as ort from "onnxruntime-web";
 import type {
   VoiceEntry,
   VoiceConfig,
@@ -39,8 +39,6 @@ export async function loadVoice(
     hfBase = "https://huggingface.co",
   } = options;
 
-  // Lazy import so tree-shaking works in SSR / Node contexts.
-  const ort: typeof import("onnxruntime-web") = await import("onnxruntime-web");
   ort.env.wasm.wasmPaths = wasmPaths;
   ort.env.wasm.numThreads = numThreads;
 
@@ -127,7 +125,6 @@ export async function synthesize(
     noiseW ?? inf.noise_w ?? 0.8,
   ]);
 
-  const ort: typeof import("onnxruntime-web") = await import("onnxruntime-web");
   const feeds: Record<string, ort.Tensor> = {
     input: new ort.Tensor("int64", BigInt64Array.from(ids, BigInt), [1, ids.length]),
     input_lengths: new ort.Tensor("int64", BigInt64Array.from([BigInt(ids.length)]), [1]),
