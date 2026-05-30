@@ -11,11 +11,4 @@ export default defineConfig({
   optimizeDeps: {
     exclude: ["onnxruntime-web"],
   },
-  server: {
-    headers: {
-      // WebGPU needs these; single-threaded WASM works without them
-      "Cross-Origin-Opener-Policy": "same-origin",
-      "Cross-Origin-Embedder-Policy": "require-corp",
-    },
-  },
 });

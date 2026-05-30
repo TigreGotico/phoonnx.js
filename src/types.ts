@@ -88,12 +88,6 @@ export interface LoadVoiceOptions {
    * Defaults to "https://huggingface.co". Override for mirrors or proxies.
    */
   hfBase?: string;
-  /**
-   * Try the WebGPU execution provider first (falls back to WASM if GPU init
-   * fails). Off by default — onnxruntime-web's WebGPU EP is unreliable for these
-   * VITS models. WASM single-threaded is the safe default.
-   */
-  webgpu?: boolean;
 }
 
 /** Options for synthesize(). */
