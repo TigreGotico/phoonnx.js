@@ -116,6 +116,7 @@ interface SynthesizeOptions {
   noiseW?: number;          // default: from model config (0.8)
   includeAlignments?: boolean;  // request per-phoneme timing output
   tokenize?: (text: string, idMap: Record<string, number>) => number[] | Promise<number[]>;
+  superResolution?: SuperResolutionConfig;  // optional 48 kHz upscaling (off by default)
 }
 ```
 
@@ -176,6 +177,68 @@ if (result.alignments) {
 Typical use-cases: visemes / lip-sync, karaoke word highlighting, subtitle generation.
 
 ---
+
+## Audio super-resolution (optional 48 kHz upscaling)
+
+Post-synthesis bandwidth extension can upscale a voice's native-rate output to
+48 kHz, mirroring the same option in the Python `phoonnx` library
+(`SynthesisConfig.super_resolution`). It runs the synthesized waveform through an
+[`audiosronnx`](https://github.com/TigreGotico/audiosronnx) ONNX model.
+
+It is **off by default**. Enable it per-call:
+
+```ts
+const result = await synthesize(voice, "Hello world", {
+  superResolution: { enabled: true, engine: "lavasr" },
+});
+// result.sampleRate === 48000
+```
+
+The SR model is lazily downloaded from HuggingFace (and cached in CacheStorage)
+the first time it's used. If the model can't be fetched or run, synthesis
+**degrades gracefully** to the voice's native sample rate — a warning is logged
+and you still get audio.
+
+### In-browser engines and download sizes
+
+The neural core is one (or two) ONNX graph(s); the surrounding DSP (resampling,
+STFT/ISTFT, mel filterbank, spectral merge) is ported to JS and verified
+numerically against the Python reference. Model size dominates browser
+suitability:
+
+| `engine` | Input | Model size | Browser? | Notes |
+|---|---|---|---|---|
+| `novasr` | 16 kHz | **~0.05 MB** | Recommended | Tiny conv1d generator, single time-domain pass. Fastest, lightest, lower fidelity. |
+| `hifiganbwe` | any | ~4 MB | Good | WaveNet bandwidth extension. |
+| `lavasr` (default) | 8–48 kHz | ~52 MB | Heavy | Two graphs + full spectral pipeline (Vocos + Linkwitz-Riley merge). Best default fidelity, but a 52 MB download. |
+| `apbwe` | any | **~120 MB** | Impractical | Highest accuracy (dual-ConvNeXt amplitude-phase), but the 120 MB download makes it unsuitable for most browsers — prefer it server-side / in Node. |
+
+All engines output 48 kHz. For a browser deployment, **`novasr`** (or
+`hifiganbwe`) is the pragmatic choice; the `lavasr` default matches the Python
+library but is a large download, and `apbwe` is really a server-side engine.
+
+```ts
+interface SuperResolutionConfig {
+  enabled?: boolean;                 // master switch (default off)
+  engine?: "lavasr" | "novasr" | "hifiganbwe" | "apbwe";  // default "lavasr"
+  denoise?: boolean;                 // lavasr only: UL-UNAS denoiser first (default false)
+  cutoffHz?: number | null;          // lavasr only: preserve original band below this
+  hfBase?: string;                   // HuggingFace base URL
+  wasmPaths?: string;                // ort WASM asset base
+  webgpu?: boolean;                  // try WebGPU for the SR graphs (default true)
+  onProgress?: (frac: number, label: string) => void;
+  logger?: { warn: (msg: string) => void; info?: (msg: string) => void };
+}
+```
+
+List the engines and their metadata at runtime:
+
+```ts
+import { availableSuperResolutionEngines } from "phoonnx";
+for (const e of availableSuperResolutionEngines()) {
+  console.log(e.engine, e.approxMB, "MB", e.repo);
+}
+```
 
 ## Self-hosting WASM assets
 
