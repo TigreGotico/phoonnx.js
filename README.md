@@ -1,15 +1,15 @@
 # phoonnx.js
 
-In-browser VITS text-to-speech inference with [onnxruntime-web](https://www.npmjs.com/package/onnxruntime-web). No server. No API. Models run entirely in your browser.
+phoonnx.js runs VITS text-to-speech models in the browser with [onnxruntime-web](https://www.npmjs.com/package/onnxruntime-web). It needs no server and no API. Every model runs inside the browser.
 
-Implements the same tokenizer paths as the Python [phoonnx](https://github.com/TigreGotico/phoonnx) library:
+It uses the same tokenizer paths as the Python [phoonnx](https://github.com/TigreGotico/phoonnx) library:
 
 | Phonemizer | Voices | Notes |
 |---|---|---|
 | `unicode` | Miro & Dii unicode voices | NFD normalization + per-codepoint id lookup |
 | `espeak` | Miro & Dii espeak voices, piper, Home Assistant | espeak-ng WASM → IPA → id lookup |
 
-The espeak voices are **drop-in compatible with piper / Home Assistant** — the same `.onnx` file works in both.
+The espeak voices work with piper and Home Assistant without changes. The same `.onnx` file runs in all three.
 
 Live demo: [tigregotico.pt/demo](https://tigregotico.pt/demo)
 
@@ -17,7 +17,7 @@ Live demo: [tigregotico.pt/demo](https://tigregotico.pt/demo)
 
 ## Install
 
-Installed straight from GitHub (not published to npm):
+phoonnx.js is not on npm. Install it straight from GitHub:
 
 ```bash
 npm install github:TigreGotico/phoonnx.js onnxruntime-web
@@ -82,9 +82,9 @@ const haVoices = getHaCompatibleVoices(); // piper/HA-compatible
 
 ### `loadVoice(entry, options?)`
 
-Downloads the ONNX model + config from HuggingFace (cached in CacheStorage),
-creates an onnxruntime-web session (WebGPU if available, WASM fallback), and
-returns a `LoadedVoice`.
+Downloads the ONNX model and config from HuggingFace, caches them in CacheStorage,
+and creates an onnxruntime-web session. It uses WebGPU when available and falls
+back to WASM. It returns a `LoadedVoice`.
 
 ```ts
 interface LoadVoiceOptions {
@@ -121,16 +121,17 @@ interface SynthesizeOptions {
 
 ### `synthesizeWav(voice, text, options?)`
 
-Shorthand for `synthesize` → `encodeWav` → `Blob`.
+Shorthand that chains `synthesize`, `encodeWav`, and `Blob` creation.
 
 ### `encodeWav(samples, sampleRate)`
 
-Encode a `Float32Array` to a 16-bit PCM WAV `Blob`.
+Encodes a `Float32Array` to a 16-bit PCM WAV `Blob`.
 
 ### `tokenizeUnicode(text, idMap)`
 
-The unicode tokenizer: strip punctuation → NFD normalize → per-codepoint
-phoneme_id_map lookup → intersperse blank → wrap BOS/EOS.
+The unicode tokenizer. It strips punctuation, applies NFD normalization, looks up
+each codepoint in the phoneme_id_map, intersperses a blank token, then wraps the
+result with BOS and EOS markers.
 
 ---
 
@@ -173,13 +174,13 @@ if (result.alignments) {
 }
 ```
 
-Typical use-cases: visemes / lip-sync, karaoke word highlighting, subtitle generation.
+Use this for visemes and lip-sync, karaoke word highlighting, or subtitle generation.
 
 ---
 
 ## Self-hosting WASM assets
 
-By default the onnxruntime-web WASM is loaded from jsDelivr CDN. To self-host:
+The default setup loads the onnxruntime-web WASM files from the jsDelivr CDN. To self-host them:
 
 ```ts
 const voice = await loadVoice(entry, {
@@ -191,6 +192,10 @@ Copy the files from `node_modules/onnxruntime-web/dist/ort-wasm*.{wasm,mjs}` to 
 
 ---
 
+## Related projects
+
+- [phoonnx](https://github.com/TigreGotico/phoonnx) — the Python library this project mirrors.
+
 ## License
 
-Apache-2.0 — same as the Python phoonnx library.
+Apache-2.0, the same license as the Python phoonnx library.
