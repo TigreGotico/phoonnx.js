@@ -11,6 +11,7 @@ import type {
 import { fetchCached } from "./cache.js";
 import { flattenIdMap, tokenizeUnicode } from "./tokenize.js";
 import { encodeWav, reconstructAlignments } from "./audio.js";
+import { loadSuperResolution } from "./superres.js";
 
 const DEFAULT_ORT_VERSION = "1.20.1";
 
@@ -150,6 +151,7 @@ export async function synthesize(
     noiseW,
     includeAlignments = false,
     tokenize,
+    superResolution,
   } = options;
 
   let ids: number[];
@@ -187,7 +189,26 @@ export async function synthesize(
 
   const results = await voice.session.run(feeds);
   const audioTensor = results[voice.session.outputNames[0]];
-  const samples = await readFloat32(audioTensor);
+  let samples = await readFloat32(audioTensor);
+  let sampleRate = voice.sampleRate;
+
+  // Optional post-synthesis super-resolution (48 kHz upscaling). Off by default.
+  // Lazily loads the SR ONNX model on first use and degrades gracefully to the
+  // voice's native sample rate if the model can't be fetched or run.
+  const sr = loadSuperResolution(superResolution);
+  if (sr) {
+    try {
+      const up = await sr.upscale(samples, sampleRate);
+      samples = up.samples;
+      sampleRate = up.sampleRate;
+    } catch (err) {
+      const warn = superResolution?.logger?.warn ?? console.warn;
+      warn(
+        `[phoonnx] super-resolution (${sr.engine}) failed (${err}); ` +
+        `returning native ${sampleRate} Hz audio.`,
+      );
+    }
+  }
 
   let alignments: PhonemeAlignment[] | null = null;
   if (includeAlignments && voice.session.outputNames.length > 1) {
@@ -206,10 +227,15 @@ export async function synthesize(
     const raw = reconstructAlignments(
       ids, rawDurations, hopLength, idxToChar, blankId, bosId, eosId,
     );
-    alignments = raw ? raw.map((r) => ({ phoneme: r.phoneme, numSamples: r.numSamples })) : null;
+    // Durations are in native-rate samples; if SR changed the rate, rescale so
+    // numSamples stays consistent with the returned (upscaled) sampleRate.
+    const scale = sampleRate / voice.sampleRate;
+    alignments = raw
+      ? raw.map((r) => ({ phoneme: r.phoneme, numSamples: Math.round(r.numSamples * scale) }))
+      : null;
   }
 
-  return { samples, sampleRate: voice.sampleRate, alignments };
+  return { samples, sampleRate, alignments };
 }
 
 /**
