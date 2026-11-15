@@ -1,15 +1,17 @@
 """Generate numerical parity fixtures from the audiosronnx Python DSP.
 
-Run inside the shared ovos venv (scipy+numpy). Writes JSON the JS test suite
-asserts against, so the JS DSP ports are checked against real Python ground truth.
+Writes dsp_fixtures.json. The JS test suite compares the JS DSP ports with it.
+
+Regenerate the fixtures with the audiosronnx package from PyPI:
+
+    uv venv .venv-fixtures
+    uv pip install -p .venv-fixtures/bin/python --prerelease=allow audiosronnx
+    .venv-fixtures/bin/python test/fixtures/gen_fixtures.py
 """
 import json
 import os
-import sys
 
 import numpy as np
-
-sys.path.insert(0, "/home/miro/AgentWorkspaces/ml/audiosronnx")
 
 from audiosronnx._kaiser import kaiser_resample
 from audiosronnx._stft import stft as torch_stft, istft as torch_istft

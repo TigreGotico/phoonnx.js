@@ -16,7 +16,7 @@ export { encodeWav, reconstructAlignments } from "./audio.js";
 export { fetchCached } from "./cache.js";
 
 export type {
-  SuperResolutionConfig,
+  SuperResolutionOptions,
   SuperResolutionEngine,
 } from "./superres.js";
 export {

@@ -1,9 +1,7 @@
 /**
- * Tests for the super-resolution wiring: config gating, engine metadata, and
- * graceful degradation. The full ONNX end-to-end (actually downloading and
- * running the audiosronnx graphs) needs onnxruntime-web with real model weights
- * and is gated behind PHOONNX_SR_E2E=1, exactly like the Python side gates its
- * ONNX e2e — CI runs the DSP parity + these wiring tests, not the model download.
+ * Tests for the super-resolution loader: engine names, engine metadata and the
+ * empty-input path. They download no model. test/synthesize.test.ts covers the
+ * stage inside synthesize().
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -14,36 +12,27 @@ import {
   SuperResolution,
 } from "../src/superres.ts";
 
-test("loadSuperResolution returns null when disabled or unset", () => {
-  assert.equal(loadSuperResolution(undefined), null);
-  assert.equal(loadSuperResolution({}), null);
-  assert.equal(loadSuperResolution({ enabled: false }), null);
-});
-
-test("loadSuperResolution builds an engine when enabled (default lavasr)", () => {
-  const sr = loadSuperResolution({ enabled: true });
+test("loadSuperResolution defaults to novasr, as Python phoonnx does", () => {
+  const sr = loadSuperResolution();
   assert.ok(sr instanceof SuperResolution);
-  assert.equal(sr!.engine, "lavasr");
+  assert.equal(sr!.engine, "novasr");
 });
 
 test("loadSuperResolution honours the requested engine alias", () => {
   for (const engine of ["novasr", "hifiganbwe", "apbwe", "lavasr"] as const) {
-    const sr = loadSuperResolution({ enabled: true, engine });
+    const sr = loadSuperResolution(engine);
     assert.equal(sr!.engine, engine);
   }
 });
 
 test("loadSuperResolution warns and returns null for an unknown engine", () => {
-  const warnings: string[] = [];
-  const sr = loadSuperResolution({
-    enabled: true,
-    // deliberately bogus alias
-    engine: "does-not-exist" as never,
-    logger: { warn: (m) => warnings.push(m) },
-  });
-  assert.equal(sr, null);
-  assert.equal(warnings.length, 1);
-  assert.match(warnings[0], /unknown super-resolution engine/);
+  for (const engine of ["does-not-exist", "toString", "constructor", "__proto__"]) {
+    const warnings: string[] = [];
+    const sr = loadSuperResolution(engine, { logger: { warn: (m) => warnings.push(m) } });
+    assert.equal(sr, null, engine);
+    assert.equal(warnings.length, 1, engine);
+    assert.match(warnings[0], /unknown super-resolution engine/);
+  }
 });
 
 test("availableSuperResolutionEngines exposes all four engines with metadata", () => {
@@ -66,7 +55,7 @@ test("availableSuperResolutionEngines exposes all four engines with metadata", (
 });
 
 test("upscale on empty input short-circuits to 48 kHz without loading a model", async () => {
-  const sr = loadSuperResolution({ enabled: true, engine: "novasr" })!;
+  const sr = loadSuperResolution("novasr")!;
   const out = await sr.upscale(new Float32Array(0), 22050);
   assert.equal(out.sampleRate, 48000);
   assert.equal(out.samples.length, 0);

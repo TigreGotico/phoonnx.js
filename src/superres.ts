@@ -1,11 +1,11 @@
 /**
  * Optional post-synthesis audio super-resolution (48 kHz upscaling).
  *
- * Mirrors the Python `phoonnx` integration of `audiosronnx`: an optional, lazily
- * loaded stage that runs a synthesized Float32 waveform through an ONNX
- * bandwidth-extension model and returns 48 kHz audio. It is off by default and
- * degrades gracefully — if a model can't be fetched or run, the caller keeps the
- * voice's native-rate audio.
+ * The same stage as the `audiosronnx` integration in Python `phoonnx`: an
+ * optional, lazily loaded step that runs a synthesized Float32 waveform through
+ * an ONNX bandwidth-extension model and returns 48 kHz audio. It is off by
+ * default. If a model can't be fetched or run, the caller keeps the voice's
+ * native-rate audio.
  *
  * The neural cores are the four `audiosronnx` ONNX graphs on HuggingFace; the
  * pre/post DSP that wraps them (resampling, STFT/ISTFT, mel, spectral merge) is
@@ -13,9 +13,9 @@
  * reference.
  *
  * In-browser suitability of the engines differs a lot by model size:
- *   - novasr     (~0.05 MB) : lightest, recommended for the browser. 16 kHz in.
+ *   - novasr     (~0.05 MB) : default; lightest, recommended for the browser. 16 kHz in.
  *   - hifiganbwe (~4 MB)    : light, any input rate.
- *   - lavasr     (~52 MB)   : default; two graphs + full spectral pipeline.
+ *   - lavasr     (~52 MB)   : two graphs + full spectral pipeline.
  *   - apbwe      (~120 MB)  : highest accuracy but heavy — impractical for most
  *                             browsers; prefer it only server-side / in Node.
  */
@@ -29,12 +29,14 @@ import {
 
 export type SuperResolutionEngine = "lavasr" | "novasr" | "hifiganbwe" | "apbwe";
 
-/** Config mirroring the Python `SynthesisConfig.super_resolution` shape. */
-export interface SuperResolutionConfig {
-  /** Master switch. Off (undefined/false) means no SR stage runs. */
-  enabled?: boolean;
-  /** Engine alias. Defaults to "lavasr" (matches the Python default). */
-  engine?: SuperResolutionEngine;
+/**
+ * The engine that `synthesize()` uses when `superResolutionModel` is unset. Python
+ * phoonnx uses the same default for `SynthesisConfig.super_resolution_model`.
+ */
+export const DEFAULT_SUPER_RESOLUTION_MODEL: SuperResolutionEngine = "novasr";
+
+/** Download and runtime options for a super-resolution engine. */
+export interface SuperResolutionOptions {
   /** LavaSR only: run the optional UL-UNAS denoiser first (default false). */
   denoise?: boolean;
   /** LavaSR only: preserve the original band below this cutoff (Hz). */
@@ -118,12 +120,12 @@ function toF64(x: Float32Array): Float64Array {
 export class SuperResolution {
   readonly engine: SuperResolutionEngine;
   private meta: EngineMeta;
-  private cfg: SuperResolutionConfig;
+  private cfg: SuperResolutionOptions;
   private sessions: Record<string, ort.InferenceSession> = {};
   private loaded = false;
   private melFb: Float64Array | null = null;
 
-  constructor(engine: SuperResolutionEngine, cfg: SuperResolutionConfig) {
+  constructor(engine: SuperResolutionEngine, cfg: SuperResolutionOptions) {
     this.engine = engine;
     this.meta = ENGINES[engine];
     this.cfg = cfg;
@@ -377,21 +379,23 @@ function scipyStftComplexForDenoiser(waveform: Float64Array): Spectrogram {
 }
 
 /**
- * Build an SR engine from a {@link SuperResolutionConfig}. Returns `null` when SR
- * is disabled. Never throws for a bad engine name — logs and returns `null` so
- * synthesis degrades gracefully to native-rate audio (mirrors the Python side).
+ * Build an SR engine by name. The models load on the first `upscale` call.
+ *
+ * An unknown engine name logs a warning and returns `null`, so synthesis keeps
+ * the native-rate audio. Python phoonnx raises a KeyError for the same input.
  */
-export function loadSuperResolution(cfg?: SuperResolutionConfig): SuperResolution | null {
-  if (!cfg?.enabled) return null;
-  const engine = (cfg.engine ?? "lavasr") as SuperResolutionEngine;
-  if (!(engine in ENGINES)) {
+export function loadSuperResolution(
+  engine: string = DEFAULT_SUPER_RESOLUTION_MODEL,
+  cfg: SuperResolutionOptions = {},
+): SuperResolution | null {
+  if (!Object.prototype.hasOwnProperty.call(ENGINES, engine)) {
     (cfg.logger?.warn ?? console.warn)(
       `[phoonnx] unknown super-resolution engine "${engine}"; ` +
       `known: ${Object.keys(ENGINES).join(", ")}. Falling back to native audio.`,
     );
     return null;
   }
-  return new SuperResolution(engine, cfg);
+  return new SuperResolution(engine as SuperResolutionEngine, cfg);
 }
 
 /** All registered SR engines with their metadata. */
