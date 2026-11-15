@@ -15,15 +15,18 @@
 // same ids as the build in .baseline/.
 //
 // With no names it runs every case without probePackages and the stages
-// reject, leak and offline. Names select case types and stages. The process
-// exits with code 1 when a case or stage fails. PHOONNX_DIST selects the build
-// under test (default /dist).
+// reject, leak, offline, builtin and raw. Names select case types and stages. The
+// process exits with code 1 when a case or stage fails. PHOONNX_DIST selects
+// the build under test (default /dist).
 //
 // --audio writes the audio of each case and of the "builtin" stage to
 // <dir>/<voice id, "/" as "__">.wav. --texts reads a TSV with the columns
 // voice and text, and speaks that text instead of the case text. A case with
 // a replaced text has no reference ids, so its ids are not compared. The
-// "builtin" stage speaks the built-in voices of the TSV through loadVoice.
+// "builtin" stage speaks the built-in voices of the TSV, or two default ones,
+// through loadVoice, and checks that each reaches a peak of 1. The "raw" stage
+// loads a voice through loadVoice and loadIndexVoice with normalizeAudio false,
+// and checks that neither scales the audio.
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
@@ -46,7 +49,6 @@ const [
   outPath = here("results.json"),
   ...only
 ] = argv;
-const DEFAULT_STAGES = ["reject", "leak", "offline"];
 const runs = (name, byDefault) => (only.length ? only.includes(name) : byDefault);
 const dist = process.env.PHOONNX_DIST ?? "/dist";
 const wasmPaths = "/node_modules/onnxruntime-web/dist/";
@@ -307,7 +309,7 @@ if (runs("legacy", false)) {
 }
 
 // Built-in voices of the --texts TSV, or two default ones, through loadVoice.
-if (runs("builtin", false)) {
+if (runs("builtin", true)) {
   const caseIds = new Set(cases.map((c) => c.voice_id));
   const ids = [...spokenTexts.keys()].filter((id) => !caseIds.has(id));
   for (const id of ids.length ? ids : ["phoonnx_oc_dii_unicode", "phoonnx_eu-ES_dii_espeak"]) {
@@ -338,10 +340,37 @@ if (runs("builtin", false)) {
     }, { id, text: spokenTexts.get(id), dist, wasmPaths, audio: Boolean(audioDir) }));
     await saveAudio(id, res);
     results[id] = { type: "builtin", ...res };
-    check(`builtin\t${id}`, !res.error && res.samples > 0 && res.peak > 0,
+    // loadVoice peak-normalizes each model run by default
+    check(`builtin\t${id}`, !res.error && res.samples > 0 && res.peak > 0.99,
       res.error ?? `${res.phonemeType} samples=${res.samples} peak=${res.peak.toFixed(3)} rms=${res.rms.toFixed(4)}`);
     await writeFile(outPath, JSON.stringify(results, null, 1));
   }
+}
+
+// normalizeAudio false keeps the model's raw level on both load paths.
+if (runs("raw", true)) {
+  const res = await withPage((page) => page.evaluate(async ({ dist, wasmPaths, pins }) => {
+    const { loadVoice, synthesize } = await import(`${dist}/index.js`);
+    const { voices } = await import(`${dist}/voices.js`);
+    const pyodide = await import(`${dist}/pyodide.js`);
+    const peakOf = (samples) => samples.reduce((m, s) => Math.max(m, Math.abs(s)), 0);
+    const builtin = await loadVoice(voices.find((v) => v.id === "phoonnx_oc_dii_unicode"),
+      { webgpu: false, wasmPaths, normalizeAudio: false });
+    const entry = (await pyodide.fetchVoiceIndex()).get("coqui/bg-cv-vits");
+    const index = await pyodide.loadIndexVoice(entry, { webgpu: false, wasmPaths, pins, normalizeAudio: false });
+    return {
+      loadVoice: { flag: builtin.normalizeAudio, peak: peakOf((await synthesize(builtin, builtin.entry.sampleText)).samples) },
+      loadIndexVoice: { flag: index.normalizeAudio, peak: peakOf((await synthesize(index, "Добър ден.")).samples) },
+    };
+  }, { dist, wasmPaths, pins: pinsOf("coqui/bg-cv-vits") }));
+  results.raw = res;
+  for (const path of ["loadVoice", "loadIndexVoice"]) {
+    const r = res[path];
+    // peak normalization makes the loudest sample exactly 1
+    check(`raw\t${path}`, !res.error && r.flag === false && r.peak > 0 && r.peak !== 1,
+      res.error ?? `normalizeAudio=${r.flag} peak=${r.peak.toFixed(3)}`);
+  }
+  await writeFile(outPath, JSON.stringify(results, null, 1));
 }
 
 await browser.close();
