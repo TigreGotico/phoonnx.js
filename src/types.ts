@@ -13,7 +13,7 @@ export interface VoiceEntry {
   /** Human-readable language label */
   langLabel: string;
   /** Tokenizer path to use */
-  phonemeType: "unicode" | "espeak";
+  phonemeType: "unicode" | "espeak" | (string & {});
   /** Filename of the ONNX model inside the repo */
   onnx: string;
   /** Filename of the phoonnx JSON config */
@@ -52,6 +52,40 @@ export interface LoadedVoice {
   sampleRate: number;
   /** "webgpu" if the GPU backend was available, "wasm" otherwise. */
   provider: string;
+  /** The voice's own tokenizer, used when synthesize() gets none. */
+  tokenize?: Tokenizer;
+  /** Scale each sentence's audio to a peak of 1, as Python phoonnx does. */
+  normalizeAudio?: boolean;
+}
+
+/**
+ * Text to token ids. A flat array is one model input; an array of arrays is
+ * one model input per sentence, and the audio of each is joined in order.
+ */
+export type Tokenizer = (
+  text: string,
+  idMap: Record<string, number>,
+) => number[] | number[][] | Promise<number[] | number[][]>;
+
+/** One voice of Python phoonnx's voice index (`phoonnx/voice_index/*.json`). */
+export interface IndexVoiceEntry {
+  voice_id: string;
+  lang: string;
+  model_url: string;
+  config_url?: string | null;
+  vocab_url?: string | null;
+  tokenizer_config_url?: string | null;
+  tokens_url?: string | null;
+  phoneme_map_url?: string | null;
+  dictionary_url?: string | null;
+  phoneme_type?: string | null;
+  phonemizer_model?: string | null;
+  phonemizer_lang?: string | null;
+  alphabet?: string | null;
+  engine?: string | null;
+  display_name?: string | null;
+  aux_model_urls?: Record<string, string> | null;
+  [field: string]: unknown;
 }
 
 /** Per-phoneme timing entry (requires an alignment-enabled ONNX model). */

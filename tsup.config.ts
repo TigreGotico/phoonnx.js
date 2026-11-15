@@ -5,7 +5,10 @@ export default defineConfig({
     index: "src/index.ts",
     voices: "src/voices.ts",
     espeak: "src/espeak.ts",
+    pyodide: "src/pyodide.ts",
   },
+  // the Python front end ships inside the bundle as a string
+  loader: { ".py": "text" },
   format: ["esm", "cjs"],
   dts: true,
   sourcemap: true,
