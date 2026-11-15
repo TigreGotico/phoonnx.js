@@ -160,6 +160,9 @@ interface SynthesizeOptions {
   noiseW?: number;          // default: from model config (0.8)
   includeAlignments?: boolean;  // request per-phoneme timing output
   tokenize?: (text: string, idMap: Record<string, number>) => number[] | Promise<number[]>;
+  superResolution?: boolean;  // upscale to 48 kHz (default false)
+  superResolutionModel?: "novasr" | "hifiganbwe" | "lavasr" | "apbwe";  // default "novasr"
+  superResolutionOptions?: SuperResolutionOptions;  // download and engine options
 }
 ```
 
@@ -253,6 +256,79 @@ test/browser/reference.json` writes the reference file. Run it in a Python
 environment with phoonnx, scriptconv and the phonemizer packages of the cases.
 
 ---
+
+## Audio super-resolution (optional 48 kHz upscaling)
+
+Super-resolution upscales the audio of a voice to 48 kHz. It runs the
+synthesized audio through an
+[`audiosronnx`](https://github.com/TigreGotico/audiosronnx) ONNX model.
+Python `phoonnx` has the same option. The two fields have the same meaning and
+default:
+
+| JS option | Python `SynthesisConfig` field | Default |
+|---|---|---|
+| `superResolution` | `super_resolution` | `false` |
+| `superResolutionModel` | `super_resolution_model` | `"novasr"` |
+
+Super-resolution is **off by default**. Turn it on for each call:
+
+```ts
+const result = await synthesize(voice, "Hello world", {
+  superResolution: true,
+  superResolutionModel: "novasr",
+});
+// result.sampleRate === 48000
+```
+
+The model runs once for each sentence, after peak normalization, as in Python
+`phoonnx`. The model downloads from Hugging Face the first time a voice uses
+it, and Cache Storage keeps it. The engine loads once for each voice and engine
+name. Later calls use the same engine.
+
+If the model cannot download or run, you get the audio at the native sample
+rate of the voice, and a warning goes to the log. An unknown engine name also
+gives a warning and native-rate audio. Python `phoonnx` raises an error for an
+unknown engine name.
+
+### Engines and download sizes
+
+The neural core is one or two ONNX graphs. The DSP around it (resampling,
+STFT/ISTFT, mel filterbank, spectral merge) is ported to JS. Tests compare it
+with the Python reference. The model size controls how well an engine works in
+a browser:
+
+| `superResolutionModel` | Input | Model size | Browser use | Notes |
+|---|---|---|---|---|
+| `novasr` (default) | 16 kHz | **~0.05 MB** | Recommended | Small conv1d generator, one time-domain pass. Fastest and lightest, lower fidelity. |
+| `hifiganbwe` | any | ~4 MB | Good | WaveNet bandwidth extension. |
+| `lavasr` | 8–48 kHz | ~52 MB | Heavy | Two graphs and the full spectral pipeline (Vocos and a Linkwitz-Riley merge). Higher fidelity, but a 52 MB download. |
+| `apbwe` | any | **~120 MB** | Not for browsers | Highest accuracy (dual-ConvNeXt amplitude-phase). Use it in Node or on a server. |
+
+All engines give 48 kHz audio.
+
+`superResolutionOptions` holds the download and engine options. They apply
+when the engine first loads for a voice:
+
+```ts
+interface SuperResolutionOptions {
+  denoise?: boolean;                 // lavasr only: run the UL-UNAS denoiser first (default false)
+  cutoffHz?: number | null;          // lavasr only: keep the original band below this frequency
+  hfBase?: string;                   // Hugging Face base URL
+  wasmPaths?: string;                // ort WASM asset base
+  webgpu?: boolean;                  // try WebGPU for the SR graphs (default true)
+  onProgress?: (frac: number, label: string) => void;
+  logger?: { warn: (msg: string) => void; info?: (msg: string) => void };
+}
+```
+
+List the engines and their metadata at runtime:
+
+```ts
+import { availableSuperResolutionEngines } from "phoonnx";
+for (const e of availableSuperResolutionEngines()) {
+  console.log(e.engine, e.approxMB, "MB", e.repo);
+}
+```
 
 ## Self-hosting WASM assets
 

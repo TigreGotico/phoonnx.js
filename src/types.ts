@@ -1,4 +1,5 @@
 import type * as ort from "onnxruntime-web";
+import type { SuperResolutionEngine, SuperResolutionOptions } from "./superres.js";
 
 /** A voice entry from the phoonnx voice registry. */
 export interface VoiceEntry {
@@ -147,4 +148,23 @@ export interface SynthesizeOptions {
   noiseW?: number;
   /** Request per-phoneme alignment output (requires a patched ONNX model). */
   includeAlignments?: boolean;
+  /**
+   * Upscale the audio to 48 kHz with an `audiosronnx` bandwidth-extension
+   * model. Off by default. When true, the audio of each model run goes through
+   * the model after peak normalization, and the {@link SynthesisResult} carries
+   * 48 kHz audio. If the model can't be fetched or run, the result keeps the
+   * voice's native rate. Python phoonnx: `SynthesisConfig.super_resolution`.
+   */
+  superResolution?: boolean;
+  /**
+   * The `audiosronnx` engine. Defaults to "novasr". Ignored unless
+   * `superResolution` is true. Python phoonnx:
+   * `SynthesisConfig.super_resolution_model`.
+   */
+  superResolutionModel?: SuperResolutionEngine;
+  /**
+   * Download and runtime options for the engine. The engine loads once per
+   * voice and engine name, so these apply when it first loads.
+   */
+  superResolutionOptions?: SuperResolutionOptions;
 }

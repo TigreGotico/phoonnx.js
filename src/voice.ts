@@ -12,8 +12,33 @@ import type {
 import { fetchCached } from "./cache.js";
 import { flattenIdMap, tokenizeUnicode } from "./tokenize.js";
 import { encodeWav, reconstructAlignments } from "./audio.js";
+import {
+  DEFAULT_SUPER_RESOLUTION_MODEL,
+  loadSuperResolution,
+  type SuperResolution,
+  type SuperResolutionOptions,
+} from "./superres.js";
 
 const DEFAULT_ORT_VERSION = "1.20.1";
+
+/** Super-resolution engines loaded for each voice, keyed by engine name. */
+const superResolutionEngines = new WeakMap<LoadedVoice, Map<string, SuperResolution>>();
+
+/** Load an SR engine once per voice and engine name, as Python phoonnx does. */
+function voiceSuperResolution(
+  voice: LoadedVoice,
+  engine: string,
+  options?: SuperResolutionOptions,
+): SuperResolution | null {
+  let engines = superResolutionEngines.get(voice);
+  if (!engines) superResolutionEngines.set(voice, (engines = new Map()));
+  let sr = engines.get(engine) ?? null;
+  if (!sr) {
+    sr = loadSuperResolution(engine, options);
+    if (sr) engines.set(engine, sr);
+  }
+  return sr;
+}
 
 function defaultWasmPaths(): string {
   // Match the WASM version to the onnxruntime-web JS that's actually loaded.
@@ -197,6 +222,9 @@ export async function synthesize(
     lengthScale,
     noiseW,
     includeAlignments = false,
+    superResolution = false,
+    superResolutionModel = DEFAULT_SUPER_RESOLUTION_MODEL,
+    superResolutionOptions,
   } = options;
 
   const tokenize = options.tokenize ?? voice.tokenize;
@@ -224,7 +252,12 @@ export async function synthesize(
     noiseW ?? inf.noise_w ?? 0.8,
   ];
 
+  let sr = superResolution
+    ? voiceSuperResolution(voice, superResolutionModel, superResolutionOptions)
+    : null;
   const chunks: Float32Array[] = [];
+  const upscaled: Float32Array[] = [];
+  let upscaledRate = voice.sampleRate;
   let alignments: PhonemeAlignment[] | null = null;
   for (const ids of sentences) {
     const results = await voice.session.run(buildFeeds(voice.session, ids, scales));
@@ -232,6 +265,22 @@ export async function synthesize(
     let samples = await readFloat32(audioTensor);
     if (voice.normalizeAudio) samples = peakNormalize(samples);
     chunks.push(samples);
+
+    // Upscale each run after normalization, as Python phoonnx does. One failure
+    // returns native-rate audio for the whole text, so all samples share one rate.
+    if (sr) {
+      try {
+        const up = await sr.upscale(samples, voice.sampleRate);
+        upscaled.push(up.samples);
+        upscaledRate = up.sampleRate;
+      } catch (err) {
+        (superResolutionOptions?.logger?.warn ?? console.warn)(
+          `[phoonnx] super-resolution (${sr.engine}) failed (${err}); ` +
+          `returning native ${voice.sampleRate} Hz audio.`,
+        );
+        sr = null;
+      }
+    }
 
     if (includeAlignments && voice.session.outputNames.length > 1) {
       const durTensor = results[voice.session.outputNames[1]];
@@ -253,7 +302,15 @@ export async function synthesize(
     }
   }
 
-  return { samples: concat(chunks), sampleRate: voice.sampleRate, alignments };
+  if (!sr) return { samples: concat(chunks), sampleRate: voice.sampleRate, alignments };
+
+  // Durations are in native-rate samples. Rescale them to the upscaled rate.
+  const scale = upscaledRate / voice.sampleRate;
+  alignments = alignments?.map((r) => ({
+    phoneme: r.phoneme,
+    numSamples: Math.round(r.numSamples * scale),
+  })) ?? null;
+  return { samples: concat(upscaled), sampleRate: upscaledRate, alignments };
 }
 
 function isNested(tokens: number[] | number[][]): tokens is number[][] {
