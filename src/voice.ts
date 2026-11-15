@@ -151,7 +151,7 @@ export async function loadVoice(
   entry: VoiceEntry,
   options: LoadVoiceOptions = {},
 ): Promise<LoadedVoice> {
-  const { hfBase = "https://huggingface.co" } = options;
+  const { hfBase = "https://huggingface.co", normalizeAudio = true } = options;
 
   const cfgBuf = await fetchCached(hfUrl(hfBase, entry.repo, entry.config));
   const config: VoiceConfig = JSON.parse(new TextDecoder().decode(cfgBuf));
@@ -167,6 +167,7 @@ export async function loadVoice(
     idMap: flattenIdMap(config.phoneme_id_map),
     sampleRate: config.audio?.sample_rate ?? config.sample_rate ?? entry.sampleRate,
     provider,
+    normalizeAudio,
   };
 }
 

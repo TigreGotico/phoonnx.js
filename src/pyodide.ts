@@ -355,6 +355,6 @@ export async function loadIndexVoice(
     sampleRate: info.sample_rate,
     provider,
     tokenize: (text: string) => py.textToIds(entry.voice_id, text),
-    normalizeAudio: true,
+    normalizeAudio: options.normalizeAudio ?? true,
   };
 }

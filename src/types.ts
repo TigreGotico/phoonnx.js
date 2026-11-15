@@ -54,7 +54,11 @@ export interface LoadedVoice {
   provider: string;
   /** The voice's own tokenizer, used when synthesize() gets none. */
   tokenize?: Tokenizer;
-  /** Scale each sentence's audio to a peak of 1, as Python phoonnx does. */
+  /**
+   * Scale the audio of each model run to a peak of 1. A tokenizer that returns
+   * one id list per sentence gives one run per sentence, as in Python phoonnx;
+   * a flat id list gives one run for the whole text.
+   */
   normalizeAudio?: boolean;
 }
 
@@ -128,6 +132,12 @@ export interface LoadVoiceOptions {
    * falls back to single-threaded WASM. Set false to force WASM/CPU.
    */
   webgpu?: boolean;
+  /**
+   * Scale the audio of each model run to a peak of 1 (see
+   * {@link LoadedVoice.normalizeAudio}). Defaults to true. Set false to get the
+   * model's raw output level.
+   */
+  normalizeAudio?: boolean;
 }
 
 /** Options for synthesize(). */

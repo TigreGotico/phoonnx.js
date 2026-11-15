@@ -134,6 +134,8 @@ interface LoadVoiceOptions {
   numThreads?: number;  // default: 1 (avoids COOP/COEP requirement)
   onProgress?: (frac: number, label: string) => void;
   hfBase?: string;      // HuggingFace base URL, default: https://huggingface.co
+  webgpu?: boolean;     // try WebGPU first, default: true
+  normalizeAudio?: boolean;  // peak-normalize each model run, default: true
 }
 ```
 
@@ -241,7 +243,10 @@ base branch in `.baseline/`.
 `/` in the voice id written as `__`. `--texts tsv` reads a file with the columns
 `voice` and `text`, and speaks that text in place of the case text. The ids of
 a replaced text are not compared, because the reference does not have them. The
-`builtin` stage speaks the built-in voices of that file through `loadVoice`.
+`builtin` stage speaks the built-in voices of that file through `loadVoice`, or
+two default built-in voices, and checks that each reaches a peak of 1. The `raw`
+stage loads a voice through `loadVoice` and `loadIndexVoice` with
+`normalizeAudio: false`, and checks that neither scales the audio.
 
 `python test/browser/reference_ids.py test/browser/cases.json
 test/browser/reference.json` writes the reference file. Run it in a Python
