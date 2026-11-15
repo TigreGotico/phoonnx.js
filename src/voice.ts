@@ -7,6 +7,7 @@ import type {
   SynthesizeOptions,
   SynthesisResult,
   PhonemeAlignment,
+  Tokenizer,
 } from "./types.js";
 import { fetchCached } from "./cache.js";
 import { flattenIdMap, tokenizeUnicode } from "./tokenize.js";
@@ -43,21 +44,101 @@ async function readFloat32(tensor: ort.Tensor): Promise<Float32Array> {
 }
 
 /**
+ * Build the ONNX feeds for one id sequence. It knows every input name of the
+ * phoonnx VITS adapter (piper/phoonnx, MMS and Hugging Face exports) and keeps
+ * the ones the model declares. `scales` follows the rank the model declares, and
+ * a declared speaker or language id is 0, as in Python phoonnx.
+ */
+function buildFeeds(
+  session: ort.InferenceSession,
+  ids: number[],
+  [noiseScale, lengthScale, noiseW]: number[],
+): Record<string, ort.Tensor> {
+  const int64 = (values: number[], dims: number[]) =>
+    new ort.Tensor("int64", BigInt64Array.from(values, BigInt), dims);
+  const float32 = (values: number[], dims: number[]) =>
+    new ort.Tensor("float32", Float32Array.from(values), dims);
+
+  const scalesMeta = (session as { inputMetadata?: readonly InferenceInputMetadata[] })
+    .inputMetadata?.find((m) => m.name === "scales");
+  const scalesDims = (scalesMeta?.shape?.length ?? 1) >= 2 ? [1, 3] : [3];
+
+  const all: Record<string, () => ort.Tensor> = {
+    input: () => int64(ids, [1, ids.length]),
+    input_lengths: () => int64([ids.length], [1]),
+    x: () => int64(ids, [1, ids.length]),
+    x_length: () => int64([ids.length], [1]),
+    input_ids: () => int64(ids, [1, ids.length]),
+    attention_mask: () => int64(ids.map(() => 1), [1, ids.length]),
+    scales: () => float32([noiseScale, lengthScale, noiseW], scalesDims),
+    noise_scale: () => float32([noiseScale], [1]),
+    noise_scale_w: () => float32([noiseW], [1]),
+    length_scale: () => float32([lengthScale], [1]),
+    sid: () => int64([0], [1]),
+    langid: () => int64([0], [1]),
+  };
+  const feeds: Record<string, ort.Tensor> = {};
+  for (const name of session.inputNames) if (all[name]) feeds[name] = all[name]();
+  return feeds;
+}
+
+interface InferenceInputMetadata {
+  name: string;
+  shape?: readonly unknown[];
+}
+
+/**
  * Tiny inference to confirm an execution provider can run this op graph AND that
  * its output can be read back (the WebGPU EP can pass create+run but fail when
  * the output buffer is read). Any throw here triggers the WASM fallback.
  */
 async function warmup(session: ort.InferenceSession): Promise<void> {
-  const ids = [1, 0, 2];
-  const feeds: Record<string, ort.Tensor> = {
-    input: new ort.Tensor("int64", BigInt64Array.from(ids, BigInt), [1, ids.length]),
-    input_lengths: new ort.Tensor("int64", BigInt64Array.from([BigInt(ids.length)]), [1]),
-    scales: new ort.Tensor("float32", Float32Array.from([0.667, 1, 0.8]), [3]),
-  };
-  const wanted = new Set(session.inputNames);
-  for (const k of Object.keys(feeds)) if (!wanted.has(k)) delete feeds[k];
-  const results = await session.run(feeds);
+  const results = await session.run(buildFeeds(session, [1, 0, 2], [0.667, 1, 0.8]));
   await readFloat32(results[session.outputNames[0]]);
+}
+
+/**
+ * Download (and cache) an ONNX model and create its inference session.
+ *
+ * It tries WebGPU (faster) first and validates it with a tiny warmup run: the
+ * EP can create a session that then fails or returns silence on an
+ * unsupported VITS op. Any error (create OR run) falls back to
+ * single-threaded WASM (CPU).
+ */
+export async function createSession(
+  onnxUrl: string,
+  options: LoadVoiceOptions = {},
+): Promise<{ session: ort.InferenceSession; provider: string }> {
+  const {
+    wasmPaths = defaultWasmPaths(),
+    numThreads = 1,
+    onProgress,
+    webgpu = true,
+  } = options;
+
+  ort.env.wasm.wasmPaths = wasmPaths;
+  ort.env.wasm.numThreads = numThreads;
+
+  const onnxBuf = await fetchCached(onnxUrl, (received, total) =>
+    onProgress?.(total ? received / total : 0, `downloading ${(received / 1e6).toFixed(1)} MB`),
+  );
+  onProgress?.(1, "initializing");
+
+  if (webgpu) {
+    try {
+      const gpu = await ort.InferenceSession.create(onnxBuf, {
+        executionProviders: ["webgpu"],
+      });
+      await warmup(gpu);
+      return { session: gpu, provider: "webgpu" };
+    } catch {
+      // fall through to WASM
+    }
+  }
+  const session = await ort.InferenceSession.create(onnxBuf, {
+    executionProviders: ["wasm"],
+  });
+  return { session, provider: "wasm" };
 }
 
 /**
@@ -70,51 +151,14 @@ export async function loadVoice(
   entry: VoiceEntry,
   options: LoadVoiceOptions = {},
 ): Promise<LoadedVoice> {
-  const {
-    wasmPaths = defaultWasmPaths(),
-    numThreads = 1,
-    onProgress,
-    hfBase = "https://huggingface.co",
-    webgpu = true,
-  } = options;
+  const { hfBase = "https://huggingface.co" } = options;
 
-  ort.env.wasm.wasmPaths = wasmPaths;
-  ort.env.wasm.numThreads = numThreads;
-
-  const cfgUrl = hfUrl(hfBase, entry.repo, entry.config);
-  const onnxUrl = hfUrl(hfBase, entry.repo, entry.onnx);
-
-  const cfgBuf = await fetchCached(cfgUrl);
+  const cfgBuf = await fetchCached(hfUrl(hfBase, entry.repo, entry.config));
   const config: VoiceConfig = JSON.parse(new TextDecoder().decode(cfgBuf));
-
-  const onnxBuf = await fetchCached(onnxUrl, (received, total) =>
-    onProgress?.(total ? received / total : 0, `downloading ${(received / 1e6).toFixed(1)} MB`),
+  const { session, provider } = await createSession(
+    hfUrl(hfBase, entry.repo, entry.onnx),
+    options,
   );
-  onProgress?.(1, "initializing");
-
-  // Try WebGPU (faster), but validate it with a tiny warmup run — the EP can
-  // create a session that then fails or returns silence on an unsupported VITS
-  // op. Any error (create OR run) falls back to single-threaded WASM (CPU).
-  let session: ort.InferenceSession | undefined;
-  let provider = "wasm";
-  if (webgpu) {
-    try {
-      const gpu = await ort.InferenceSession.create(onnxBuf, {
-        executionProviders: ["webgpu"],
-      });
-      await warmup(gpu);
-      session = gpu;
-      provider = "webgpu";
-    } catch {
-      session = undefined;
-    }
-  }
-  if (!session) {
-    session = await ort.InferenceSession.create(onnxBuf, {
-      executionProviders: ["wasm"],
-    });
-    provider = "wasm";
-  }
 
   return {
     entry,
@@ -133,15 +177,18 @@ export async function loadVoice(
  * rate, and optionally per-phoneme alignment timings (when the model was
  * exported with `--add-phoneme-alignment`).
  *
- * For the espeak phonemizer path, pass `tokenize` explicitly using
- * `tokenizeEspeak` from `phoonnx/espeak`.
+ * The tokenizer is `options.tokenize`, else the voice's own (voices from
+ * `phoonnx/pyodide`), else tokenizeUnicode for "unicode" voices. For the
+ * espeak phonemizer path, pass `tokenize` explicitly using `tokenizeEspeak`
+ * from `phoonnx/espeak`. A tokenizer that returns one id list per sentence
+ * runs the model once per sentence and joins the audio.
  */
 export async function synthesize(
   voice: LoadedVoice,
   text: string,
   options: SynthesizeOptions & {
-    /** Override the tokenizer. Defaults to tokenizeUnicode for "unicode" voices. */
-    tokenize?: (text: string, idMap: Record<string, number>) => number[] | Promise<number[]>;
+    /** Override the tokenizer. */
+    tokenize?: Tokenizer;
   } = {},
 ): Promise<SynthesisResult> {
   const {
@@ -149,14 +196,14 @@ export async function synthesize(
     lengthScale,
     noiseW,
     includeAlignments = false,
-    tokenize,
   } = options;
 
-  let ids: number[];
+  const tokenize = options.tokenize ?? voice.tokenize;
+  let tokens: number[] | number[][];
   if (tokenize) {
-    ids = await tokenize(text, voice.idMap);
+    tokens = await tokenize(text, voice.idMap);
   } else if (voice.entry.phonemeType === "unicode") {
-    ids = tokenizeUnicode(text, voice.idMap);
+    tokens = tokenizeUnicode(text, voice.idMap);
   } else {
     throw new Error(
       `Voice "${voice.entry.id}" uses phonemeType "${voice.entry.phonemeType}". ` +
@@ -164,52 +211,68 @@ export async function synthesize(
     );
   }
 
-  if (ids.length <= 3) {
+  const sentences = isNested(tokens) ? tokens.filter((ids) => ids.length > 0) : [tokens];
+  if (sentences.length === 0 || (!isNested(tokens) && tokens.length <= 3)) {
     throw new Error("Nothing to synthesize — text produced no phoneme tokens.");
   }
 
   const inf = voice.config.inference ?? {};
-  const scales = Float32Array.from([
+  const scales = [
     noiseScale ?? inf.noise_scale ?? 0.667,
     lengthScale ?? inf.length_scale ?? 1.0,
     noiseW ?? inf.noise_w ?? 0.8,
-  ]);
+  ];
 
-  const feeds: Record<string, ort.Tensor> = {
-    input: new ort.Tensor("int64", BigInt64Array.from(ids, BigInt), [1, ids.length]),
-    input_lengths: new ort.Tensor("int64", BigInt64Array.from([BigInt(ids.length)]), [1]),
-    scales: new ort.Tensor("float32", scales, [3]),
-  };
-
-  // Only pass inputs declared by the model (different exports differ).
-  const wanted = new Set(voice.session.inputNames);
-  for (const k of Object.keys(feeds)) if (!wanted.has(k)) delete feeds[k];
-
-  const results = await voice.session.run(feeds);
-  const audioTensor = results[voice.session.outputNames[0]];
-  const samples = await readFloat32(audioTensor);
-
+  const chunks: Float32Array[] = [];
   let alignments: PhonemeAlignment[] | null = null;
-  if (includeAlignments && voice.session.outputNames.length > 1) {
-    const durTensor = results[voice.session.outputNames[1]];
-    const rawDurations = durTensor.data as Float32Array;
-    const hopLength = 256; // standard VITS hop size
+  for (const ids of sentences) {
+    const results = await voice.session.run(buildFeeds(voice.session, ids, scales));
+    const audioTensor = results[voice.session.outputNames[0]];
+    let samples = await readFloat32(audioTensor);
+    if (voice.normalizeAudio) samples = peakNormalize(samples);
+    chunks.push(samples);
 
-    // Build reverse id map from the voice's phoneme_id_map.
-    const idxToChar = new Map<number, string>();
-    for (const [ch, id] of Object.entries(voice.idMap)) idxToChar.set(id, ch);
+    if (includeAlignments && voice.session.outputNames.length > 1) {
+      const durTensor = results[voice.session.outputNames[1]];
+      const rawDurations = durTensor.data as Float32Array;
+      const hopLength = 256; // standard VITS hop size
 
-    const blankId = voice.idMap["_"] ?? 0;
-    const bosId = voice.idMap["^"] ?? 1;
-    const eosId = voice.idMap["$"] ?? 2;
+      // Build reverse id map from the voice's phoneme_id_map.
+      const idxToChar = new Map<number, string>();
+      for (const [ch, id] of Object.entries(voice.idMap)) idxToChar.set(id, ch);
 
-    const raw = reconstructAlignments(
-      ids, rawDurations, hopLength, idxToChar, blankId, bosId, eosId,
-    );
-    alignments = raw ? raw.map((r) => ({ phoneme: r.phoneme, numSamples: r.numSamples })) : null;
+      const blankId = voice.idMap["_"] ?? 0;
+      const bosId = voice.idMap["^"] ?? 1;
+      const eosId = voice.idMap["$"] ?? 2;
+
+      const raw = reconstructAlignments(
+        ids, rawDurations, hopLength, idxToChar, blankId, bosId, eosId,
+      );
+      if (raw) alignments = [...(alignments ?? []), ...raw];
+    }
   }
 
-  return { samples, sampleRate: voice.sampleRate, alignments };
+  return { samples: concat(chunks), sampleRate: voice.sampleRate, alignments };
+}
+
+function isNested(tokens: number[] | number[][]): tokens is number[][] {
+  return tokens.length > 0 && Array.isArray(tokens[0]);
+}
+
+/** Scale to a peak of 1, as Python phoonnx's default level_audio does. */
+function peakNormalize(samples: Float32Array): Float32Array {
+  let peak = 0;
+  for (const s of samples) peak = Math.max(peak, Math.abs(s));
+  if (peak < 1e-8) return new Float32Array(samples.length);
+  return samples.map((s) => Math.max(-1, Math.min(1, s / peak)));
+}
+
+function concat(chunks: Float32Array[]): Float32Array {
+  if (chunks.length === 1) return chunks[0];
+  const out = new Float32Array(chunks.reduce((n, c) => n + c.length, 0));
+  let off = 0;
+  for (const c of chunks) { out.set(c, off); off += c.length; }
+  return out;
 }
 
 /**

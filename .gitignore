@@ -1,3 +1,7 @@
 node_modules/
 dist/
 *.tsbuildinfo
+.baseline/
+__pycache__/
+.prefix/
+test/browser/results.json
