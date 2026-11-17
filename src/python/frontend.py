@@ -3,8 +3,8 @@
 phoonnx.js runs this module in Pyodide. The ONNX graph runs in
 onnxruntime-web, so this module never opens one. It maps each URL of a voice
 index entry to the file phoonnx.js already downloaded, loads the voice with
-``TTSModelInfo.load`` as Python phoonnx does, and records the token ids that
-``TTSVoice.synthesize`` hands to the model, one list per sentence.
+``TTSModelInfo.load`` as Python phoonnx does, and reads the token ids of each
+sentence from ``TTSVoice.prepare``, the text step of ``TTSVoice.synthesize``.
 
 Packages that phoonnx needs only to download files or to open a graph are
 replaced by empty modules when they are not installed. No front-end code path
@@ -13,8 +13,6 @@ calls them.
 import sys
 import types
 from pathlib import Path
-
-import numpy as np
 
 
 class _Placeholder:
@@ -93,15 +91,7 @@ def load_voice(key: str, entry: dict, files: dict) -> dict:
     _files.update(files)
     info = model_manager.TTSModelInfo(**entry)
     voice = info.load()
-    captured: list = []  # the token ids of each sentence, in synthesis order
-
-    def phoneme_ids_to_audio(phoneme_ids, syn_config=None, include_alignments=False):
-        captured.append([int(i) for i in phoneme_ids])
-        audio = np.zeros(1, dtype=np.float32)
-        return (audio, None) if include_alignments else audio
-
-    voice.phoneme_ids_to_audio = phoneme_ids_to_audio
-    _voices[key] = (voice, captured)
+    _voices[key] = voice
     config = voice.config
     return {
         "sample_rate": config.sample_rate,
@@ -116,8 +106,4 @@ def load_voice(key: str, entry: dict, files: dict) -> dict:
 
 def text_to_ids(key: str, text: str) -> list:
     """The token ids of each sentence of ``text``, as phoonnx feeds them."""
-    voice, captured = _voices[key]
-    captured.clear()
-    for _ in voice.synthesize(text):
-        pass
-    return [list(ids) for ids in captured]
+    return [[int(i) for i in utterance.ids] for utterance in _voices[key].prepare(text)]
