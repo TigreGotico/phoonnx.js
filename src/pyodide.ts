@@ -56,7 +56,7 @@ const VITS_ENGINES = new Set(["piper", "mimic3", "coqui", "phoonnx", "transforme
 const BASE_PACKAGES = [
   "phoonnx", "scriptconv", "quebra-frases", "linguatag", "langcodes",
   "ovos-number-parser", "unicode-rbnf", "ovos-date-parser", "chronologia",
-  "ovos-spec-tools", "ovos-utils", "dateparser", "tzlocal",
+  "ovos-spec-tools", "ovos-utils", "dateparser", "tzlocal", "numtag", "text2spoken",
 ];
 const PYODIDE_PACKAGES = ["numpy", "regex", "python-dateutil", "pytz"];
 
