@@ -273,13 +273,15 @@ if (runs("legacy", false)) {
     for (const v of voices) {
       const cfg = await (await fetch(`https://huggingface.co/${v.repo}/resolve/main/${v.config}`)).json();
       const idMap = now.flattenIdMap(cfg.phoneme_id_map);
+      const keep = now.keepsPunctuation(cfg);
       for (const text of [v.sampleText, ...texts]) {
         if (v.phonemeType === "unicode") {
-          const a = now.tokenizeUnicode(text, idMap), b = before.tokenizeUnicode(text, idMap);
+          const a = await now.tokenizeUnicode(text, idMap, { keepPunctuation: keep });
+          const b = [before.tokenizeUnicode(text, idMap)];
           out.unicode.push({ id: v.id, text, equal: JSON.stringify(a) === JSON.stringify(b), n: a.length });
         } else {
-          const a = await espeakNow.tokenizeEspeak(text, v.espeakVoice, idMap, espeakFactory, wasm);
-          const b = await espeakBefore.tokenizeEspeak(text, v.espeakVoice, idMap, espeakFactory, wasm);
+          const a = await espeakNow.tokenizeEspeak(text, v.espeakVoice, idMap, espeakFactory, wasm, { keepPunctuation: keep });
+          const b = [await espeakBefore.tokenizeEspeak(text, v.espeakVoice, idMap, espeakFactory, wasm)];
           out.espeak.push({ id: v.id, text, equal: JSON.stringify(a) === JSON.stringify(b), n: a.length });
         }
       }
