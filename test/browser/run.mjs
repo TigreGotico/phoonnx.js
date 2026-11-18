@@ -291,7 +291,7 @@ if (runs("legacy", false)) {
       const entry = voices.find((v) => v.id === id);
       const voice = await now.loadVoice(entry, ortOptions);
       const tokenize = entry.phonemeType === "espeak"
-        ? (text, idMap) => espeakNow.tokenizeEspeak(text, entry.espeakVoice, idMap, espeakFactory, wasm)
+        ? (text, idMap) => espeakNow.tokenizeEspeak(text, entry.espeakVoice, idMap, espeakFactory, wasm, { keepPunctuation: voice.keepPunctuation })
         : undefined;
       const r = await now.synthesize(voice, entry.sampleText, { tokenize });
       let peak = 0;
@@ -322,7 +322,7 @@ if (runs("builtin", true)) {
       if (!entry) throw new Error(`not a built-in voice: ${id}`);
       const voice = await loadVoice(entry, { webgpu: false, wasmPaths });
       const tokenize = entry.phonemeType === "espeak"
-        ? (t, idMap) => tokenizeEspeak(t, entry.espeakVoice, idMap, espeakFactory, "/node_modules/espeak-ng/dist/espeak-ng.wasm")
+        ? (t, idMap) => tokenizeEspeak(t, entry.espeakVoice, idMap, espeakFactory, "/node_modules/espeak-ng/dist/espeak-ng.wasm", { keepPunctuation: voice.keepPunctuation })
         : undefined;
       const spoken = text ?? entry.sampleText;
       const r = await synthesize(voice, spoken, { tokenize });

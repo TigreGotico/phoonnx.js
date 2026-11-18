@@ -1,0 +1,206 @@
+/**
+ * Text to phoneme symbols, one list per sentence, as Python phoonnx reads a
+ * voice that uses a unicode or espeak phonemizer.
+ *
+ * The code follows scriptconv's `TextFrontend` (sentence and paragraph cuts),
+ * `BasePhonemizer` (`chunk_text`, `split_clauses`, `remove_punctuation`) and
+ * quebra-frases (`sentence_tokenize`). The phonemizer itself is the `readClause`
+ * argument: it takes one clause and returns its phoneme string.
+ */
+
+// Python `\\w` of the `regex` module, and of the `re` module (no marks).
+const WORD_WITH_MARKS = "\\p{L}\\p{M}\\p{N}_";
+const WORD = "\\p{L}\\p{N}_";
+
+// quebra_frases `_SENTENCE_REGEX`: a space after "." or "?" ends a sentence,
+// except after an abbreviation such as "e.g" or "Dr.".
+const SENTENCE_BREAK = new RegExp(
+  `(?<![${WORD_WITH_MARKS}]\\.[${WORD_WITH_MARKS}][^\\n])(?<![A-Z][a-z]\\.)(?<=\\.|\\?)\\s`,
+  "u",
+);
+// scriptconv `_PARAGRAPH_BREAK`.
+const PARAGRAPH_BREAK = /(\n(?:[^\S\n]*\n)+)/;
+// scriptconv `_CLAUSE_BREAK`.
+const CLAUSE_BREAK = new RegExp(
+  `(?:\\.\\.+|\\u2026|[,:;!?|\\u060c\\u061b\\u061f])[^${WORD}\\s]*(?=\\s)`,
+  "gu",
+);
+const TRAILING_PUNCTUATION = new RegExp(`[^${WORD}\\s]+\\s*$`, "u");
+const LANG_FLAGS = /\([^)]+\)/g;
+
+// scriptconv `CLAUSE_PUNCTUATION`: the clause marks and the symbol each one is kept as.
+const CLAUSE_PUNCTUATION: Record<string, string> = {
+  ".": ".", "?": "?", "!": "!", ",": ",", ":": ":", ";": ";",
+  "،": ",", "؛": ";", "؟": "?",
+};
+const PAUSE_PUNCTUATION = new Set([",", ":", ";"]);
+const SEPARATING_MARKS = new Set(
+  Object.entries(CLAUSE_PUNCTUATION).filter(([, s]) => s === "!" || s === "?").map(([m]) => m),
+);
+const CHUNK_DELIMITERS = [":", ";", "...", "|"];
+
+const isAlpha = (ch: string | undefined) => ch !== undefined && /^\p{L}$/u.test(ch);
+const isDigit = (ch: string | undefined) => ch !== undefined && /^\p{Nd}$/u.test(ch);
+
+export function sentenceTokenize(text: string): string[] {
+  return text.split(SENTENCE_BREAK);
+}
+
+/** `BasePhonemizer._between_letters`: the character at `index` stands between two letters. */
+function betweenLetters(chars: string[], index: number): boolean {
+  if (!(index > 0 && index < chars.length - 1) || !isAlpha(chars[index + 1])) return false;
+  let letter = index - 1;
+  while (letter > 0 && /^\p{M}$/u.test(chars[letter])) letter--;
+  return isAlpha(chars[letter]);
+}
+
+/** `BasePhonemizer.remove_punctuation`. */
+export function removePunctuation(text: string): string {
+  const chars = Array.from(text);
+  const out: string[] = [];
+  let separates = false;
+  for (let i = 0; i < chars.length; i++) {
+    const c = chars[i];
+    if ((c === "'" || c === "’" || c === "-") && betweenLetters(chars, i)) {
+      out.push(c);
+      continue;
+    }
+    if (SEPARATING_MARKS.has(c)) {
+      if (i === 0 || !SEPARATING_MARKS.has(chars[i - 1])) {
+        let end = i;
+        while (end < chars.length && SEPARATING_MARKS.has(chars[end])) end++;
+        let letter = i - 1;
+        while (letter > 0 && /^\p{M}$/u.test(chars[letter])) letter--;
+        separates = i > 0 && isAlpha(chars[letter]) && end < chars.length && isAlpha(chars[end]);
+        if (separates) out.push(" ");
+      }
+      if (separates) continue;
+    }
+    if (i > 0 && i < chars.length - 1 && isDigit(chars[i - 1]) && isDigit(chars[i + 1])) {
+      out.push(c);
+      continue;
+    }
+    if (/^\p{P}$/u.test(c)) continue;
+    out.push(c);
+  }
+  return out.join("").trim();
+}
+
+function clauseMark(punctuation: string): string | null {
+  if (punctuation.includes("..") || punctuation.includes("…")) return null;
+  for (const c of punctuation) if (c in CLAUSE_PUNCTUATION) return CLAUSE_PUNCTUATION[c];
+  return null;
+}
+
+/** `split_clauses`: `[clause, mark]` pairs of one sentence. */
+export function splitClauses(sentence: string): Array<[string, string | null]> {
+  const clauses: Array<[string, string | null]> = [];
+  let start = 0;
+  for (const match of sentence.matchAll(CLAUSE_BREAK)) {
+    clauses.push([sentence.slice(start, match.index), clauseMark(match[0])]);
+    start = match.index! + match[0].length;
+  }
+  const tail = sentence.slice(start);
+  const trailing = TRAILING_PUNCTUATION.exec(tail);
+  clauses.push([tail, trailing ? clauseMark(trailing[0]) : null]);
+  return clauses;
+}
+
+/** `BasePhonemizer.chunk_text`: the chunks of each sentence, with whether it ends its sentence. */
+function chunkText(text: string): Array<[string, boolean]> {
+  const alternatives = CHUNK_DELIMITERS.map((delimiter) => {
+    const escaped = delimiter.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    return `(?:(?<!\\d)${escaped}|${escaped}(?!\\d))`;
+  }).join("|");
+  const delimiters = new RegExp(`(${alternatives})`);
+  const chunks: Array<[string, boolean]> = [];
+  for (const sentence of sentenceTokenize(text)) {
+    const parts = sentence.split(delimiters);
+    for (let i = 0; i < parts.length; i += 2) chunks.push([parts[i].trim(), i + 2 >= parts.length]);
+  }
+  return chunks;
+}
+
+/** `_clause_breaks_as_spaces`: each line of the phonemizer output is a clause, and a space joins them. */
+function clauseBreaksAsSpaces(phonemes: string): string {
+  if (!phonemes.includes("\n")) return phonemes;
+  return phonemes.split("\n").map((line) => line.trim()).filter(Boolean).join(" ");
+}
+
+export type ReadClause = (clause: string) => string | Promise<string>;
+
+async function readSymbols(read: ReadClause, clause: string): Promise<string[]> {
+  const phonemes = clause === "" ? "" : (await read(clause)).trim().replace(LANG_FLAGS, "");
+  return Array.from(clauseBreaksAsSpaces(phonemes));
+}
+
+/** The sentences of `BasePhonemizer._punctuated_sentences`: clause symbols stay. */
+async function punctuatedSentences(text: string, read: ReadClause): Promise<string[][]> {
+  const sentences: string[][] = [];
+  for (const sentence of sentenceTokenize(text)) {
+    const phonemes: string[] = [];
+    for (const [rawClause, mark] of splitClauses(sentence)) {
+      const clause = removePunctuation(rawClause);
+      if (!clause) continue;
+      const clausePhonemes = await readSymbols(read, clause);
+      if (clausePhonemes.length === 0) continue;
+      if (phonemes.length > 0 && phonemes[phonemes.length - 1] !== " ") phonemes.push(" ");
+      phonemes.push(...clausePhonemes);
+      if (mark) {
+        phonemes.push(mark);
+        if (PAUSE_PUNCTUATION.has(mark)) phonemes.push(" ");
+      }
+    }
+    if (phonemes.length > 0) sentences.push(phonemes);
+  }
+  return sentences;
+}
+
+/** The sentences of `BasePhonemizer._bare_sentences`: no punctuation reaches the voice. */
+async function bareSentences(text: string, read: ReadClause): Promise<string[][]> {
+  const sentences: string[][] = [];
+  let chunks: string[][] = [];
+  for (const [chunk, endsSentence] of chunkText(text)) {
+    chunks.push(await readSymbols(read, removePunctuation(chunk)));
+    if (endsSentence) {
+      const joined: string[] = [];
+      let joins = true;
+      for (const symbols of chunks) {
+        if (symbols.length === 0) continue;
+        if (!joins) joined.push(" ");
+        joined.push(...symbols);
+        joins = symbols[symbols.length - 1] === " ";
+      }
+      sentences.push(joined);
+      chunks = [];
+    }
+  }
+  return sentences;
+}
+
+/**
+ * The symbols of each sentence of `text`, as `TextFrontend.segments` gives them
+ * for a phonemizer that keeps no state: paragraphs, then sentences, then the
+ * phonemizer's own sentence cut. A sentence with no symbols is left out.
+ */
+export async function phonemeSentences(
+  text: string,
+  read: ReadClause,
+  keepPunctuation: boolean,
+): Promise<string[][]> {
+  const out: string[][] = [];
+  if (!text.trim()) return out;
+  const paragraphs = text.split(PARAGRAPH_BREAK).filter((_, i) => i % 2 === 0);
+  for (const paragraph of paragraphs) {
+    if (!paragraph.trim()) continue;
+    for (const sentence of sentenceTokenize(paragraph)) {
+      const part = sentence.trimStart();
+      if (!part.trim()) continue;
+      const segments = keepPunctuation
+        ? await punctuatedSentences(part, read)
+        : await bareSentences(part, read);
+      for (const symbols of segments) if (symbols.length > 0) out.push(symbols);
+    }
+  }
+  return out;
+}

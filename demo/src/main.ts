@@ -100,7 +100,9 @@ btn.addEventListener("click", async () => {
     const tokenize =
       entry.phonemeType === "espeak"
         ? (t: string, idMap: Record<string, number>) =>
-            espeakTokenize(t, idMap, entry.espeakVoice ?? undefined)
+            espeakTokenize(t, idMap, entry.espeakVoice ?? undefined, {
+              keepPunctuation: loaded!.keepPunctuation,
+            })
         : undefined;
     const { samples, sampleRate } = await synthesize(loaded, text, {
       lengthScale: 1 / +speed.value,
