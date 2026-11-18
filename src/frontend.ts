@@ -127,22 +127,26 @@ function clauseBreaksAsSpaces(phonemes: string): string {
   return phonemes.split("\n").map((line) => line.trim()).filter(Boolean).join(" ");
 }
 
-export type ReadClause = (clause: string) => string | Promise<string>;
+/** Reads one clause into its phoneme string. */
+type ReadClause = (clause: string) => string;
 
-async function readSymbols(read: ReadClause, clause: string): Promise<string[]> {
-  const phonemes = clause === "" ? "" : (await read(clause)).trim().replace(LANG_FLAGS, "");
+/** Reads every clause of a text into its phoneme string, in one call. */
+export type ReadClauses = (clauses: string[]) => string[] | Promise<string[]>;
+
+function readSymbols(read: ReadClause, clause: string): string[] {
+  const phonemes = clause === "" ? "" : read(clause).trim().replace(LANG_FLAGS, "");
   return Array.from(clauseBreaksAsSpaces(phonemes));
 }
 
 /** The sentences of `BasePhonemizer._punctuated_sentences`: clause symbols stay. */
-async function punctuatedSentences(text: string, read: ReadClause): Promise<string[][]> {
+function punctuatedSentences(text: string, read: ReadClause): string[][] {
   const sentences: string[][] = [];
   for (const sentence of sentenceTokenize(text)) {
     const phonemes: string[] = [];
     for (const [rawClause, mark] of splitClauses(sentence)) {
       const clause = removePunctuation(rawClause);
       if (!clause) continue;
-      const clausePhonemes = await readSymbols(read, clause);
+      const clausePhonemes = readSymbols(read, clause);
       if (clausePhonemes.length === 0) continue;
       if (phonemes.length > 0 && phonemes[phonemes.length - 1] !== " ") phonemes.push(" ");
       phonemes.push(...clausePhonemes);
@@ -157,11 +161,11 @@ async function punctuatedSentences(text: string, read: ReadClause): Promise<stri
 }
 
 /** The sentences of `BasePhonemizer._bare_sentences`: no punctuation reaches the voice. */
-async function bareSentences(text: string, read: ReadClause): Promise<string[][]> {
+function bareSentences(text: string, read: ReadClause): string[][] {
   const sentences: string[][] = [];
   let chunks: string[][] = [];
   for (const [chunk, endsSentence] of chunkText(text)) {
-    chunks.push(await readSymbols(read, removePunctuation(chunk)));
+    chunks.push(readSymbols(read, removePunctuation(chunk)));
     if (endsSentence) {
       const joined: string[] = [];
       let joins = true;
@@ -178,16 +182,7 @@ async function bareSentences(text: string, read: ReadClause): Promise<string[][]
   return sentences;
 }
 
-/**
- * The symbols of each sentence of `text`, as `TextFrontend.segments` gives them
- * for a phonemizer that keeps no state: paragraphs, then sentences, then the
- * phonemizer's own sentence cut. A sentence with no symbols is left out.
- */
-export async function phonemeSentences(
-  text: string,
-  read: ReadClause,
-  keepPunctuation: boolean,
-): Promise<string[][]> {
+function sentencesOf(text: string, read: ReadClause, keepPunctuation: boolean): string[][] {
   const out: string[][] = [];
   if (!text.trim()) return out;
   const paragraphs = text.split(PARAGRAPH_BREAK).filter((_, i) => i % 2 === 0);
@@ -196,11 +191,30 @@ export async function phonemeSentences(
     for (const sentence of sentenceTokenize(paragraph)) {
       const part = sentence.trimStart();
       if (!part.trim()) continue;
-      const segments = keepPunctuation
-        ? await punctuatedSentences(part, read)
-        : await bareSentences(part, read);
+      const segments = keepPunctuation ? punctuatedSentences(part, read) : bareSentences(part, read);
       for (const symbols of segments) if (symbols.length > 0) out.push(symbols);
     }
   }
   return out;
+}
+
+/**
+ * The symbols of each sentence of `text`, as `TextFrontend.segments` gives them
+ * for a phonemizer that keeps no state: paragraphs, then sentences, then the
+ * phonemizer's own sentence cut. A sentence with no symbols is left out.
+ *
+ * The cuts depend on the text only, so the clauses are collected first and
+ * `readClauses` reads all of them in one call, which lets an espeak voice use
+ * one engine instance for the whole text.
+ */
+export async function phonemeSentences(
+  text: string,
+  readClauses: ReadClauses,
+  keepPunctuation: boolean,
+): Promise<string[][]> {
+  const clauses: string[] = [];
+  sentencesOf(text, (clause) => (clauses.push(clause), ""), keepPunctuation);
+  const phonemes = await readClauses(clauses);
+  let next = 0;
+  return sentencesOf(text, () => phonemes[next++], keepPunctuation);
 }

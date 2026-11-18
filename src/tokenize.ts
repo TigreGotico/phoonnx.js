@@ -89,7 +89,7 @@ export async function tokenizeUnicode(
 ): Promise<number[][]> {
   const sentences = await phonemeSentences(
     text,
-    (clause) => clause.normalize("NFD"),
+    (clauses) => clauses.map((clause) => clause.normalize("NFD")),
     options.keepPunctuation ?? false,
   );
   return sentences.map((symbols) => symbolsToIds(symbols, idMap));

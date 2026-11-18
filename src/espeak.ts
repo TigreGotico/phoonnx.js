@@ -28,11 +28,12 @@
  * ```
  */
 
-import { phonemeSentences } from "./frontend.js";
+import { phonemeSentences, type ReadClauses } from "./frontend.js";
 import { symbolsToIds, type TokenizeOptions } from "./tokenize.js";
 
 type EspeakFactory = (opts: {
   arguments: string[];
+  stdin: () => number | null;
   print: (s: string) => void;
   printErr: (s: string) => void;
   locateFile: (p: string) => string;
@@ -87,16 +88,32 @@ export async function tokenizeEspeak(
   wasmUrl: string,
   options: TokenizeOptions = {},
 ): Promise<number[][]> {
-  const readClause = async (clause: string) => {
+  // One espeak-ng instance reads every clause: stdin holds one clause per line,
+  // and the instance prints the phonemes of each line on a line of its own.
+  const run = async (clauses: string[]): Promise<string[]> => {
+    const bytes = new TextEncoder().encode(clauses.join("\n"));
+    let next = 0;
     const lines: string[] = [];
     await espeakFactory({
-      arguments: ["-q", "--ipa", "-v", espeakVoice, clause],
+      arguments: ["-q", "--ipa", "-v", espeakVoice],
+      stdin: () => (next < bytes.length ? bytes[next++] : null),
       print: (s: string) => lines.push(s),
       printErr: () => {},
       locateFile: (p: string) => (p.endsWith(".wasm") ? wasmUrl : p),
     });
-    return lines.join("\n");
+    return lines;
   };
-  const sentences = await phonemeSentences(text, readClause, options.keepPunctuation ?? false);
+  const readClauses: ReadClauses = async (clauses) => {
+    if (clauses.length === 0) return [];
+    // A newline inside a clause reads as a space, so a line is one clause.
+    const single = clauses.map((clause) => clause.replace(/\r?\n/g, " "));
+    const lines = await run(single);
+    if (lines.length === single.length) return lines;
+    // Some clause printed no line or several. Read each clause alone.
+    const alone: string[] = [];
+    for (const clause of single) alone.push((await run([clause])).join("\n"));
+    return alone;
+  };
+  const sentences = await phonemeSentences(text, readClauses, options.keepPunctuation ?? false);
   return sentences.map((symbols) => symbolsToIds(symbols, idMap));
 }
