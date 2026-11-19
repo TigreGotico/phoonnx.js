@@ -7,7 +7,7 @@
 // with no network or a fixture that is not published yet.
 import { readFile } from "node:fs/promises";
 
-export const PHOONNX_COMMIT = "738a795970787d9a2981c0e618e1667bc149d5e3";
+export const PHOONNX_COMMIT = "e42d4ebd4800ce06837f45080393c610ccfb688e";
 const URL_OF_FIXTURE =
   `https://raw.githubusercontent.com/TigreGotico/phoonnx/${PHOONNX_COMMIT}/tests/fixtures/id_parity.json`;
 
