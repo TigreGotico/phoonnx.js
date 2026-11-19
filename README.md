@@ -61,7 +61,8 @@ const entry = getVoice("phoonnx_eu-ES_dii_espeak")!;
 const voice = await loadVoice(entry);
 
 const result = await synthesize(voice, "Kaixo mundua!", {
-  tokenize: (text, idMap) => tokenize(text, idMap, entry.espeakVoice!),
+  tokenize: (text, idMap) =>
+    tokenize(text, idMap, entry.espeakVoice!, { keepPunctuation: voice.keepPunctuation }),
 });
 const blob = encodeWav(result.samples, result.sampleRate);
 ```
@@ -159,7 +160,7 @@ interface SynthesizeOptions {
   lengthScale?: number;     // default: from model config (1.0)
   noiseW?: number;          // default: from model config (0.8)
   includeAlignments?: boolean;  // request per-phoneme timing output
-  tokenize?: (text: string, idMap: Record<string, number>) => number[] | Promise<number[]>;
+  tokenize?: (text: string, idMap: Record<string, number>) => number[] | number[][] | Promise<number[] | number[][]>;
   superResolution?: boolean;  // upscale to 48 kHz (default false)
   superResolutionModel?: "novasr" | "hifiganbwe" | "lavasr" | "apbwe";  // default "novasr"
   superResolutionOptions?: SuperResolutionOptions;  // download and engine options
@@ -174,11 +175,25 @@ Shorthand that chains `synthesize`, `encodeWav`, and `Blob` creation.
 
 Encodes a `Float32Array` to a 16-bit PCM WAV `Blob`.
 
-### `tokenizeUnicode(text, idMap)`
+### `tokenizeUnicode(text, idMap, options?)`
 
-The unicode tokenizer. It strips punctuation, applies NFD normalization, looks up
-each codepoint in the phoneme_id_map, intersperses a blank token, then wraps the
-result with BOS and EOS markers.
+The unicode tokenizer. It returns one id list per sentence, as Python phoonnx
+does. The text splits into paragraphs, sentences and clauses with the same rules
+as phoonnx. Each clause loses its punctuation, or keeps its clause symbol
+(`. ? ! , : ;`) when `options.keepPunctuation` is true. `LoadedVoice.keepPunctuation`
+holds the value of a voice, read from its config as phoonnx reads it.
+
+Each NFD codepoint becomes an id from the phoneme_id_map. A character that the map
+lacks takes the id of its decomposition or of its lowercase form, and is dropped
+if neither is in the map. A blank id goes between the ids, and BOS and EOS wrap
+each list.
+
+phoonnx also converts numbers, dates and abbreviations to words before this
+step, and applies the phonetic spellings of the language. phoonnx.js does neither
+for built-in voices, so a text with digits gives other ids than Python.
+
+`tokenizeEspeak` and `makeEspeakTokenizer` follow the same rules. espeak-ng reads each
+clause alone, and the result is one id list per sentence.
 
 ---
 

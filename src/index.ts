@@ -11,7 +11,8 @@ export type {
 } from "./types.js";
 
 export { loadVoice, createSession, synthesize, synthesizeWav } from "./voice.js";
-export { tokenizeUnicode, flattenIdMap } from "./tokenize.js";
+export { tokenizeUnicode, flattenIdMap, keepsPunctuation } from "./tokenize.js";
+export type { TokenizeOptions } from "./tokenize.js";
 export { encodeWav, reconstructAlignments } from "./audio.js";
 export { fetchCached } from "./cache.js";
 

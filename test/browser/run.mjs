@@ -273,13 +273,15 @@ if (runs("legacy", false)) {
     for (const v of voices) {
       const cfg = await (await fetch(`https://huggingface.co/${v.repo}/resolve/main/${v.config}`)).json();
       const idMap = now.flattenIdMap(cfg.phoneme_id_map);
+      const keep = now.keepsPunctuation(cfg);
       for (const text of [v.sampleText, ...texts]) {
         if (v.phonemeType === "unicode") {
-          const a = now.tokenizeUnicode(text, idMap), b = before.tokenizeUnicode(text, idMap);
+          const a = await now.tokenizeUnicode(text, idMap, { keepPunctuation: keep });
+          const b = [before.tokenizeUnicode(text, idMap)];
           out.unicode.push({ id: v.id, text, equal: JSON.stringify(a) === JSON.stringify(b), n: a.length });
         } else {
-          const a = await espeakNow.tokenizeEspeak(text, v.espeakVoice, idMap, espeakFactory, wasm);
-          const b = await espeakBefore.tokenizeEspeak(text, v.espeakVoice, idMap, espeakFactory, wasm);
+          const a = await espeakNow.tokenizeEspeak(text, v.espeakVoice, idMap, espeakFactory, wasm, { keepPunctuation: keep });
+          const b = [await espeakBefore.tokenizeEspeak(text, v.espeakVoice, idMap, espeakFactory, wasm)];
           out.espeak.push({ id: v.id, text, equal: JSON.stringify(a) === JSON.stringify(b), n: a.length });
         }
       }
@@ -291,7 +293,7 @@ if (runs("legacy", false)) {
       const entry = voices.find((v) => v.id === id);
       const voice = await now.loadVoice(entry, ortOptions);
       const tokenize = entry.phonemeType === "espeak"
-        ? (text, idMap) => espeakNow.tokenizeEspeak(text, entry.espeakVoice, idMap, espeakFactory, wasm)
+        ? (text, idMap) => espeakNow.tokenizeEspeak(text, entry.espeakVoice, idMap, espeakFactory, wasm, { keepPunctuation: voice.keepPunctuation })
         : undefined;
       const r = await now.synthesize(voice, entry.sampleText, { tokenize });
       let peak = 0;
@@ -322,7 +324,7 @@ if (runs("builtin", true)) {
       if (!entry) throw new Error(`not a built-in voice: ${id}`);
       const voice = await loadVoice(entry, { webgpu: false, wasmPaths });
       const tokenize = entry.phonemeType === "espeak"
-        ? (t, idMap) => tokenizeEspeak(t, entry.espeakVoice, idMap, espeakFactory, "/node_modules/espeak-ng/dist/espeak-ng.wasm")
+        ? (t, idMap) => tokenizeEspeak(t, entry.espeakVoice, idMap, espeakFactory, "/node_modules/espeak-ng/dist/espeak-ng.wasm", { keepPunctuation: voice.keepPunctuation })
         : undefined;
       const spoken = text ?? entry.sampleText;
       const r = await synthesize(voice, spoken, { tokenize });

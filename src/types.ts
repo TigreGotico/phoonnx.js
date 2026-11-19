@@ -34,6 +34,14 @@ export interface VoiceEntry {
 /** Raw JSON config loaded from HuggingFace alongside the ONNX model. */
 export interface VoiceConfig {
   phoneme_id_map: Record<string, number | number[]>;
+  /** Whether the voice was trained with clause punctuation. */
+  keep_punctuation?: boolean;
+  /** Present in the config that phoonnx writes. */
+  phoonnx_version?: string;
+  /** Present in a piper config. */
+  piper_version?: string;
+  alphabet?: string;
+  phoneme_type?: string;
   inference?: {
     noise_scale?: number;
     length_scale?: number;
@@ -53,6 +61,8 @@ export interface LoadedVoice {
   sampleRate: number;
   /** "webgpu" if the GPU backend was available, "wasm" otherwise. */
   provider: string;
+  /** Whether the voice keeps clause punctuation, as its config says. Default false. */
+  keepPunctuation?: boolean;
   /** The voice's own tokenizer, used when synthesize() gets none. */
   tokenize?: Tokenizer;
   /**

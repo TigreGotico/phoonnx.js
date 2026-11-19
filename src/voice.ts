@@ -10,7 +10,7 @@ import type {
   Tokenizer,
 } from "./types.js";
 import { fetchCached } from "./cache.js";
-import { flattenIdMap, tokenizeUnicode } from "./tokenize.js";
+import { flattenIdMap, keepsPunctuation, tokenizeUnicode } from "./tokenize.js";
 import { encodeWav, reconstructAlignments } from "./audio.js";
 import {
   DEFAULT_SUPER_RESOLUTION_MODEL,
@@ -190,6 +190,7 @@ export async function loadVoice(
     session,
     config,
     idMap: flattenIdMap(config.phoneme_id_map),
+    keepPunctuation: keepsPunctuation(config),
     sampleRate: config.audio?.sample_rate ?? config.sample_rate ?? entry.sampleRate,
     provider,
     normalizeAudio,
@@ -232,7 +233,7 @@ export async function synthesize(
   if (tokenize) {
     tokens = await tokenize(text, voice.idMap);
   } else if (voice.entry.phonemeType === "unicode") {
-    tokens = tokenizeUnicode(text, voice.idMap);
+    tokens = await tokenizeUnicode(text, voice.idMap, { keepPunctuation: voice.keepPunctuation });
   } else {
     throw new Error(
       `Voice "${voice.entry.id}" uses phonemeType "${voice.entry.phonemeType}". ` +
