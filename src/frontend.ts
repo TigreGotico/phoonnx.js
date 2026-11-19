@@ -20,12 +20,17 @@ const SENTENCE_BREAK = new RegExp(
 );
 // scriptconv `_PARAGRAPH_BREAK`.
 const PARAGRAPH_BREAK = /(\n(?:[^\S\n]*\n)+)/;
-// scriptconv `_CLAUSE_BREAK`.
+// Python `\s` (`str.isspace`). JavaScript's `\s` lacks U+001C to U+001F and U+0085,
+// and holds U+FEFF.
+const SPACE = "\\t-\\r\\x1c-\\x20\\x85\\xa0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000";
+// scriptconv `_CLAUSE_BREAK` and `_TRAILING_PUNCTUATION`. A match starts only where
+// a run of marks starts, so a long run is read once. Group 1 is the clause break.
+const MARK = `[^${WORD}${SPACE}]`;
 const CLAUSE_BREAK = new RegExp(
-  `(?:\\.\\.+|\\u2026|[,:;!?|\\u060c\\u061b\\u061f])[^${WORD}\\s]*(?=\\s)`,
+  `(?<!${MARK})(?=${MARK}*[${SPACE}])${MARK}*?((?:\\.\\.|\\u2026|[,:;!?|\\u060c\\u061b\\u061f])${MARK}*)`,
   "gu",
 );
-const TRAILING_PUNCTUATION = new RegExp(`[^${WORD}\\s]+\\s*$`, "u");
+const TRAILING_PUNCTUATION = new RegExp(`(?<!${MARK})${MARK}+[${SPACE}]*$`, "u");
 const LANG_FLAGS = /\([^)]+\)/g;
 
 // scriptconv `CLAUSE_PUNCTUATION`: the clause marks and the symbol each one is kept as.
@@ -97,8 +102,10 @@ export function splitClauses(sentence: string): Array<[string, string | null]> {
   const clauses: Array<[string, string | null]> = [];
   let start = 0;
   for (const match of sentence.matchAll(CLAUSE_BREAK)) {
-    clauses.push([sentence.slice(start, match.index), clauseMark(match[0])]);
-    start = match.index! + match[0].length;
+    const end = match.index! + match[0].length;
+    // Group 1, the break, ends where the match ends.
+    clauses.push([sentence.slice(start, end - match[1].length), clauseMark(match[1])]);
+    start = end;
   }
   const tail = sentence.slice(start);
   const trailing = TRAILING_PUNCTUATION.exec(tail);
