@@ -8,7 +8,7 @@
  * argument: it takes one clause and returns its phoneme string.
  */
 
-// Python `\\w` of the `regex` module, and of the `re` module (no marks).
+// WORD is Python `re` `\w`; WORD_WITH_MARKS adds marks. `isDigit` is Nd only, `chunkText` `\d` is ASCII.
 const WORD_WITH_MARKS = "\\p{L}\\p{M}\\p{N}_";
 const WORD = "\\p{L}\\p{N}_";
 
@@ -156,7 +156,7 @@ function punctuatedSentences(text: string, read: ReadClause): string[][] {
       const clausePhonemes = readSymbols(read, clause);
       if (clausePhonemes.length === 0) continue;
       if (phonemes.length > 0 && phonemes[phonemes.length - 1] !== " ") phonemes.push(" ");
-      phonemes.push(...clausePhonemes);
+      for (const symbol of clausePhonemes) phonemes.push(symbol);
       if (mark) {
         phonemes.push(mark);
         if (PAUSE_PUNCTUATION.has(mark)) phonemes.push(" ");
@@ -179,7 +179,7 @@ function bareSentences(text: string, read: ReadClause): string[][] {
       for (const symbols of chunks) {
         if (symbols.length === 0) continue;
         if (!joins) joined.push(" ");
-        joined.push(...symbols);
+        for (const symbol of symbols) joined.push(symbol);
         joins = symbols[symbols.length - 1] === " ";
       }
       sentences.push(joined);

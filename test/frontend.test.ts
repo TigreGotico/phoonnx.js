@@ -10,7 +10,7 @@ import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 
-import { splitClauses } from "../src/frontend.ts";
+import { phonemeSentences, splitClauses } from "../src/frontend.ts";
 
 const PARITY = JSON.parse(
   readFileSync(new URL("./fixtures/clause_parity.json", import.meta.url), "utf8"),
@@ -19,6 +19,15 @@ const PARITY = JSON.parse(
 test("clauses are the clauses of Python scriptconv", () => {
   for (const [text, clauses] of PARITY.rows) {
     assert.deepEqual(splitClauses(text), clauses, JSON.stringify(text));
+  }
+});
+
+test("one clause of 200,000 symbols reads in both punctuation modes", async () => {
+  const symbols = "x".repeat(200_000);
+  const readClauses = (clauses: string[]) => clauses.map(() => symbols);
+  for (const keepPunctuation of [true, false]) {
+    const sentences = await phonemeSentences("a", readClauses, keepPunctuation);
+    assert.deepEqual(sentences, [Array.from(symbols)]);
   }
 });
 
