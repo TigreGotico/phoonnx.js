@@ -4,7 +4,7 @@
 covers: how to run the unicode, espeak and Pyodide voices in Node, and what Node needs that a browser does not
 source: src/voice.ts:loadVoice, src/voice.ts:createSession, src/cache.ts:fetchCached, src/espeak.ts:makeEspeakTokenizer, src/pyodide.ts:loadIndexVoice
 generated: no
-verify: run each script on this page with node in a project that installed phoonnx, espeak-ng and pyodide. Then compare the output with the text block under it
+verify: npm install --no-save pyodide@314.0.8 >/dev/null && npm run build >/dev/null && diff <(node --input-type=module -e "$(awk -v n=1 '/^\140\140\140/{f=0} $0=="\140\140\140js"{c++} $0=="\140\140\140js"&&c==n{f=2} f==1{print} f==2{f=1}' docs/node.md)" 2>&1) <(awk -v n=1 '/^\140\140\140/{f=0} $0=="\140\140\140text"{c++} $0=="\140\140\140text"&&c==n{f=2} f==1{print} f==2{f=1}' docs/node.md) && diff <(node --input-type=module -e "$(awk -v n=2 '/^\140\140\140/{f=0} $0=="\140\140\140js"{c++} $0=="\140\140\140js"&&c==n{f=2} f==1{print} f==2{f=1}' docs/node.md)" 2>&1) <(awk -v n=2 '/^\140\140\140/{f=0} $0=="\140\140\140text"{c++} $0=="\140\140\140text"&&c==n{f=2} f==1{print} f==2{f=1}' docs/node.md) && diff <(node --input-type=module -e "$(awk -v n=3 '/^\140\140\140/{f=0} $0=="\140\140\140js"{c++} $0=="\140\140\140js"&&c==n{f=2} f==1{print} f==2{f=1}' docs/node.md)" 2>&1 | grep -v -e '^Didn.t find' -e '^Package ' -e ' - WARNING - ') <(awk -v n=3 '/^\140\140\140/{f=0} $0=="\140\140\140text"{c++} $0=="\140\140\140text"&&c==n{f=2} f==1{print} f==2{f=1}' docs/node.md) && rm out.wav espeak.wav mms.wav
 see: docs/browser.md, docs/api.md
 -->
 
@@ -34,22 +34,23 @@ const voice = await loadVoice(entry, { wasmPaths, webgpu: false });
 console.log("provider:", voice.provider, "sample rate:", voice.sampleRate);
 
 const result = await synthesize(voice, entry.sampleText);
+const peak = result.samples.reduce((max, s) => Math.max(max, Math.abs(s)), 0);
 console.log("text:", entry.sampleText);
-console.log("seconds:", (result.samples.length / result.sampleRate).toFixed(2));
+console.log("peak:", peak);
 
 const wav = encodeWav(result.samples, result.sampleRate);
 await writeFile("out.wav", Buffer.from(await wav.arrayBuffer()));
-console.log("wrote out.wav,", wav.size, "bytes");
+console.log("out.wav:", wav.type, (wav.size - 44) / result.samples.length, "bytes per sample");
 ```
 
 ```text
 provider: wasm sample rate: 22050
 text: Olá! Esta voz corre no teu navegador, sem servidores.
-seconds: 3.34
-wrote out.wav, 147500 bytes
+peak: 1
+out.wav: audio/wav 2 bytes per sample
 ```
 
-The duration and the file size change a little from run to run, because VITS adds random noise to each synthesis. `encodeWav` returns a `Blob`. `Buffer.from(await blob.arrayBuffer())` turns it into bytes for `writeFile`.
+`synthesize` scales the audio of each sentence to a peak of 1, so `peak` is 1. `encodeWav` writes a 44-byte header and 16-bit samples. It returns a `Blob`, and `Buffer.from(await blob.arrayBuffer())` turns it into bytes for `writeFile`.
 
 ## An espeak voice
 
@@ -77,26 +78,23 @@ const entry = getVoice("pipertts_en-GB_miro");
 const voice = await loadVoice(entry, { wasmPaths, webgpu: false });
 
 const text = "Hello! This voice runs in Node. It reads two sentences.";
-const ids = await tokenize(text, voice.idMap, entry.espeakVoice);
-console.log("espeak voice:", entry.espeakVoice, "sentences:", ids.length);
+const options = { keepPunctuation: voice.keepPunctuation };
+const ids = await tokenize(text, voice.idMap, entry.espeakVoice, options);
+console.log("espeak voice:", entry.espeakVoice, "keepPunctuation:", voice.keepPunctuation);
+console.log("sentences:", ids.length, "first ids:", ids[0].slice(0, 8).join(" "));
 
 const result = await synthesize(voice, text, {
-  tokenize: (t, idMap) =>
-    tokenize(t, idMap, entry.espeakVoice, { keepPunctuation: voice.keepPunctuation }),
+  tokenize: (t, idMap) => tokenize(t, idMap, entry.espeakVoice, options),
 });
-console.log("keepPunctuation:", voice.keepPunctuation);
-console.log("seconds:", (result.samples.length / result.sampleRate).toFixed(2));
-
 const wav = encodeWav(result.samples, result.sampleRate);
 await writeFile("espeak.wav", Buffer.from(await wav.arrayBuffer()));
-console.log("wrote espeak.wav,", wav.size, "bytes");
+console.log("espeak.wav:", wav.type, result.sampleRate, "Hz");
 ```
 
 ```text
-espeak voice: en-gb-x-rp sentences: 2
-keepPunctuation: true
-seconds: 4.40
-wrote espeak.wav, 194092 bytes
+espeak voice: en-gb-x-rp keepPunctuation: true
+sentences: 2 first ids: 1 0 20 0 59 0 24 0
+espeak.wav: audio/wav 22050 Hz
 ```
 
 The text has three sentence ends, but the tokenizer gives two sentences. A space after `.` or `?` ends a sentence, as in Python phoonnx, so `Hello! This voice runs in Node.` is one sentence.
@@ -119,39 +117,24 @@ const wasmPaths = new URL("./node_modules/onnxruntime-web/dist/", import.meta.ur
 const indexURL = fileURLToPath(new URL("./node_modules/pyodide/", import.meta.url));
 
 const index = await fetchVoiceIndex();
-console.log("VITS voices in the index:", index.size);
+const entry = index.get("facebook/mms-tts-por-Portuguese");
+console.log("phoneme type:", entry.phoneme_type);
 
-const voice = await loadIndexVoice(index.get("facebook/mms-tts-por-Portuguese"), {
-  wasmPaths,
-  indexURL,
-  pins: { phoonnx: "1.113.10a2" },
-  webgpu: false,
-  onProgress: (frac, label) => console.log(label),
-});
+const voice = await loadIndexVoice(entry, { wasmPaths, indexURL, webgpu: false });
 const result = await synthesize(voice, "Olá! Tenho 3 gatos.");
-console.log("phoneme type:", voice.entry.phonemeType, "sample rate:", result.sampleRate);
-console.log("seconds:", (result.samples.length / result.sampleRate).toFixed(2));
 const wav = encodeWav(result.samples, result.sampleRate);
 await writeFile("mms.wav", Buffer.from(await wav.arrayBuffer()));
-console.log("wrote mms.wav,", wav.size, "bytes");
+console.log("mms.wav:", wav.type, result.sampleRate, "Hz");
 ```
 
 ```text
-VITS voices in the index: 1539
-loading Python
+phoneme type: graphemes
 Loading micropip, numpy, python-dateutil, pytz, regex, six
 Loaded micropip, numpy, python-dateutil, pytz, regex, six
-installing the phoonnx front end
-Python ready
-initializing
-loading the text front end
-2026-11-21 20:39:51.447 - OVOS - phoonnx.providers:available_providers:94 - WARNING - could not query onnxruntime providers: phoonnx.js front end: this call needs a package it does not load
-phoneme type: graphemes sample rate: 16000
-seconds: 2.13
-wrote mms.wav, 68140 bytes
+mms.wav: audio/wav 16000 Hz
 ```
 
-Pyodide also prints two lines for each package that it downloads from the jsDelivr CDN, and it keeps a copy in `node_modules/pyodide/`. The output above leaves those lines out. The WARNING line comes from the Python phoonnx log. The pin on `phoonnx` is necessary: [Using a voice in the browser](browser.md#the-phoonnx-pin) explains why.
+Pyodide prints the two `Loading` lines. On the first run, it also prints two lines for each package that it downloads from the jsDelivr CDN, and it keeps a copy in `node_modules/pyodide/`. Python phoonnx logs a WARNING line, with a time stamp, because the front end does not load onnxruntime. The output above leaves out the download lines and the WARNING line.
 
 ---
 [Index](index.md) · [← Using a voice in the browser](browser.md) · [API reference →](api.md)

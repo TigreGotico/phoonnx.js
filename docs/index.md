@@ -4,7 +4,7 @@
 covers: the reading order of every page in docs/, with what each page gives the reader
 source: docs/*.md
 generated: no
-verify: check that each relative link and anchor in README.md and docs/*.md resolves to a file and a heading
+verify: diff <(ls docs | grep -v '^index.md$' | sort) <(grep -o '^[0-9]*\. \[[^]]*\]([^)]*)' docs/index.md | sed 's/.*(\(.*\))/\1/' | sort)
 see: README.md, docs/getting-started.md
 -->
 

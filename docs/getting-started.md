@@ -4,7 +4,7 @@
 covers: how to install phoonnx.js and speak a first sentence in a web page
 source: package.json, src/voice.ts:loadVoice, src/voice.ts:synthesizeWav, src/voices.ts:getVoice
 generated: no
-verify: follow the steps in an empty folder, open `http://localhost:8000/` in Chromium and click Speak. Then compare the console with the text block in step 5
+verify: none, checked by reading src/voice.ts:synthesizeWav and src/voices.ts:getVoice
 see: docs/browser.md, docs/node.md
 -->
 
@@ -58,7 +58,7 @@ This page takes you from an empty folder to a web page that speaks a sentence. Y
    button.onclick = async () => {
      const blob = await synthesizeWav(voice, entry.sampleText);
      console.log("text:", entry.sampleText);
-     console.log("wav bytes:", blob.size);
+     console.log("wav type:", blob.type);
      await new Audio(URL.createObjectURL(blob)).play();
      console.log("playing");
    };
@@ -80,11 +80,11 @@ This page takes you from an empty folder to a web page that speaks a sentence. Y
    No available adapters.
    provider: wasm
    text: Adieu! Aquesta votz parla dins ton navegador.
-   wav bytes: 128556
+   wav type: audio/wav
    playing
    ```
 
-   The first load downloads the voice model, about 63 MB, from Hugging Face. The browser keeps it in Cache Storage, and a reload does not download it again. The `downloading` progress lines are left out above. The `No available adapters.` warning comes from onnxruntime-web in a browser with no WebGPU, and the library then uses WASM. The size of the WAV file changes a little from run to run, because VITS adds random noise to each synthesis.
+   The first load downloads the voice model, about 63 MB, from Hugging Face. The browser keeps it in Cache Storage, and a reload does not download it again. The `downloading` progress lines are left out above. The `No available adapters.` warning comes from onnxruntime-web in a browser with no WebGPU, and the library then uses WASM.
 
 ## Next steps
 

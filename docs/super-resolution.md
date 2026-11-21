@@ -4,7 +4,7 @@
 covers: how to upscale the audio of a voice to 48 kHz, the four engines, their options, and what happens when an engine fails
 source: src/superres.ts, src/voice.ts:synthesize, src/types.ts:SynthesizeOptions, test/synthesize.test.ts, test/superres.test.ts
 generated: no
-verify: npm test (the super-resolution tests), and run the example on this page with node in a project that installed phoonnx. Then compare the output with the text block
+verify: npm run build >/dev/null && diff <(node --input-type=module -e "$(awk -v n=1 '/^\140\140\140/{f=0} $0=="\140\140\140js"{c++} $0=="\140\140\140js"&&c==n{f=2} f==1{print} f==2{f=1}' docs/super-resolution.md)" 2>&1) <(awk -v n=1 '/^\140\140\140/{f=0} $0=="\140\140\140text"{c++} $0=="\140\140\140text"&&c==n{f=2} f==1{print} f==2{f=1}' docs/super-resolution.md)
 see: docs/api.md, docs/testing.md
 -->
 
@@ -27,8 +27,8 @@ const voice = await loadVoice(getVoice("phoonnx_pt-PT_miro_unicode"), { wasmPath
 
 const native = await synthesize(voice, "Olá mundo.");
 const upscaled = await synthesize(voice, "Olá mundo.", { superResolution: true });
-console.log("native:", native.sampleRate, "Hz,", native.samples.length, "samples");
-console.log("upscaled:", upscaled.sampleRate, "Hz,", upscaled.samples.length, "samples");
+console.log("native:", native.sampleRate, "Hz");
+console.log("upscaled:", upscaled.sampleRate, "Hz");
 
 const unknown = await synthesize(voice, "Olá mundo.", {
   superResolution: true,
@@ -42,13 +42,13 @@ lavasr 52 MB TigreGotico/audiosronnx-lavasr
 novasr 0.05 MB TigreGotico/audiosronnx-novasr
 hifiganbwe 4 MB TigreGotico/audiosronnx-hifiganbwe
 apbwe 120 MB TigreGotico/audiosronnx-apbwe
-native: 22050 Hz, 19456 samples
-upscaled: 48000 Hz, 44024 samples
+native: 22050 Hz
+upscaled: 48000 Hz
 [phoonnx] unknown super-resolution engine "nosuchengine"; known: lavasr, novasr, hifiganbwe, apbwe. Falling back to native audio.
 unknown engine: 22050 Hz
 ```
 
-The sample counts change from run to run, because VITS adds random noise to each synthesis.
+The warning goes to `console.warn`, on standard error.
 
 ## How it runs
 

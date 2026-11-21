@@ -4,7 +4,7 @@
 covers: every name that the four entry points export, with its options and return type
 source: src/index.ts, src/types.ts, src/voice.ts, src/tokenize.ts, src/audio.ts, src/cache.ts, src/voices.ts, src/espeak.ts, src/pyodide.ts, src/superres.ts
 generated: no
-verify: npm run typecheck && npm run build, then compare each name here with the exports in dist/index.d.ts, dist/voices.d.ts, dist/espeak.d.ts and dist/pyodide.d.ts
+verify: npm run build >/dev/null && ! grep -h '^export' dist/index.d.ts dist/voices.d.ts dist/espeak.d.ts dist/pyodide.d.ts | sed 's/^export \(type \)\?{//' | sed 's/}.*//' | tr ',' '\n' | sed 's/.* as //' | tr -d ' ' | grep -vxFf <(grep -o '[A-Za-z_][A-Za-z0-9_]*' docs/api.md | sort -u) | grep .
 see: docs/browser.md, docs/node.md, docs/super-resolution.md
 -->
 
@@ -138,7 +138,7 @@ interface LoadedVoice {
 
 | Export | Returns |
 |---|---|
-| `voices` | All 36 built-in voices |
+| `voices` | All built-in voices |
 | `getVoice(id)` | The voice with that `id`, or `undefined` |
 | `getVoicesByLang(lang)` | The voices whose `lang` is exactly `lang`. The tags have a region where the voice has one, such as `eu-ES` |
 | `getVoicesBySpeaker(speaker)` | The voices whose `voice` is `speaker`, such as `"Miro"` or `"Dii"` |
@@ -193,7 +193,7 @@ interface VoiceEntry {
 interface PyodideFrontendOptions {
   indexURL?: string;                  // Pyodide base. Default: jsDelivr, for PYODIDE_VERSION
   extraPackages?: string[];           // more PyPI requirements
-  pins?: Record<string, string>;      // exact versions, e.g. { phoonnx: "1.98.1a3" }
+  pins?: Record<string, string>;      // exact versions, e.g. { scriptconv: "0.0.4a85" }
   onProgress?: (frac: number, label: string) => void;
 }
 ```

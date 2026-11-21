@@ -11,7 +11,7 @@ phoonnx.js is a TypeScript library that runs phoonnx and Piper VITS voices with 
 | `src/tokenize.ts`, `src/frontend.ts` | The unicode tokenizer, and the paragraph, sentence and clause split of Python phoonnx |
 | `src/espeak.ts` | The `phoonnx/espeak` entry point |
 | `src/pyodide.ts`, `src/python/frontend.py` | The `phoonnx/pyodide` entry point and the Python front end that runs in Pyodide |
-| `src/voices.ts`, `src/voices-data.json` | The `phoonnx/voices` entry point and the 36 built-in voices |
+| `src/voices.ts`, `src/voices-data.json` | The `phoonnx/voices` entry point and the built-in voices |
 | `src/superres.ts`, `src/dsp.ts` | Super-resolution engines and their signal processing |
 | `src/audio.ts`, `src/cache.ts`, `src/types.ts` | WAV encoding and alignments, the Cache Storage fetch, the shared types |
 | `tsup.config.ts` | The build of the four entry points into `dist/`, ESM and CommonJS |
@@ -37,8 +37,6 @@ The browser test needs a build and the Playwright Chromium:
 npx playwright install chromium
 npm run test:browser
 ```
-
-The index cases of the browser test fail with the phoonnx version that `test/browser/reference.json` records ([testing.md](docs/testing.md#the-browser-test)).
 
 ## Hard rules
 

@@ -4,7 +4,7 @@
 covers: the checks that CI runs, the Node unit tests, the headless browser test against Python phoonnx, and how the reference files are made
 source: package.json:scripts, .github/workflows/ci.yml, test/*.test.ts, test/id_parity_fixture.mjs, test/browser/run.mjs, test/browser/reference_ids.py, test/fixtures/gen_fixtures.py
 generated: no
-verify: npm install && npm run typecheck && npm run build && npm test, then npm run test:browser -- test/browser/cases.json test/browser/reference.json <out.json> graphemes reject
+verify: npm test 2>&1 | grep '^ℹ' | grep -v duration_ms | diff - <(awk -v n=1 '/^\140\140\140/{f=0} $0=="\140\140\140text"{c++} $0=="\140\140\140text"&&c==n{f=2} f==1{print} f==2{f=1}' docs/testing.md)
 see: docs/api.md, AGENTS.md
 -->
 
@@ -21,7 +21,7 @@ npm run build
 npm test
 ```
 
-`npm test` runs the Node unit tests in `test/*.test.ts` with `node --import tsx --test`. A run gives:
+`npm test` runs the Node unit tests in `test/*.test.ts` with `node --import tsx --test`. The summary lines of a run, without the `duration_ms` line, are:
 
 ```text
 ℹ tests 36
@@ -31,7 +31,6 @@ npm test
 ℹ cancelled 0
 ℹ skipped 0
 ℹ todo 0
-ℹ duration_ms 8253.622904
 ```
 
 | File | What it checks |
@@ -72,14 +71,14 @@ A name selects a case type, such as `graphemes`, or a stage. The cases with `pro
 A run of the `graphemes` cases and the `reject` stage gives:
 
 ```text
-graphemes	facebook/mms-tts-eng-English	FAIL	ERROR Error: page.evaluate: PythonError: Traceback (most recent call last):
-graphemes	facebook/mms-tts-por-Portuguese	FAIL	ERROR Error: page.evaluate: PythonError: Traceback (most recent call last):
-graphemes	coqui/bg-cv-vits	FAIL	ERROR Error: page.evaluate: PythonError: Traceback (most recent call last):
+graphemes	facebook/mms-tts-eng-English	PASS	idsEqual=true versionsMatch=true lazyInstall=true samples=84224 peak=1.000 rms=0.1363 ready=17.8s
+graphemes	facebook/mms-tts-por-Portuguese	PASS	idsEqual=true versionsMatch=true lazyInstall=true samples=54784 peak=1.000 rms=0.1608 ready=16.5s
+graphemes	coqui/bg-cv-vits	PASS	idsEqual=true versionsMatch=true lazyInstall=true samples=23040 peak=1.000 rms=0.1925 ready=14.5s
 reject	PASS	OpenVoiceOS/phoonnx_oc_miro_unicode outcome=rejected requests=0 Error: phoneme type "unicode" has no browser front end in phoonnx.js
-FAILED 3: graphemes	facebook/mms-tts-eng-English, graphemes	facebook/mms-tts-por-Portuguese, graphemes	coqui/bg-cv-vits
+ALL PASSED
 ```
 
-The `error` field of each failed case in the output JSON ends with `AttributeError: 'TTSVoice' object has no attribute 'prepare'`. The reference records phoonnx 1.98.1a3, and `src/python/frontend.py` calls `TTSVoice.prepare`, which phoonnx has from 1.110.0a1. The index cases need a reference that `reference_ids.py` writes with a phoonnx release that has `prepare` and that the front end can load, such as 1.113.10a2. [The phoonnx pin](browser.md#the-phoonnx-pin) gives the range.
+The sample counts, the RMS values and the `ready` times change from run to run. `idsEqual=true` says that the token ids match the reference. `versionsMatch=true` says that the front end installed the package versions that the reference records.
 
 `python test/browser/reference_ids.py test/browser/cases.json test/browser/reference.json` writes the reference file. Run it in a Python environment with phoonnx, scriptconv and the phonemizer packages of the cases.
 

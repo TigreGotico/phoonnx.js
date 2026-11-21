@@ -4,7 +4,7 @@
 covers: what phoonnx.js does, how to install it, a first example, and where each topic lives in docs/
 source: package.json, src/index.ts, src/voices-data.json, src/pyodide.ts:PHONEME_TYPE_PACKAGES
 generated: no
-verify: in an empty folder, run the Install command, save the First example as out.mjs and run `node out.mjs`. Then compare the output with the text block
+verify: npm run build >/dev/null && diff <(node --input-type=module -e "$(awk -v n=1 '/^\140\140\140/{f=0} $0=="\140\140\140js"{c++} $0=="\140\140\140js"&&c==n{f=2} f==1{print} f==2{f=1}' README.md)" 2>&1) <(awk -v n=1 '/^\140\140\140/{f=0} $0=="\140\140\140text"{c++} $0=="\140\140\140text"&&c==n{f=2} f==1{print} f==2{f=1}' README.md) && rm out.wav
 see: docs/index.md, docs/getting-started.md
 -->
 
@@ -45,19 +45,20 @@ const voice = await loadVoice(entry, { wasmPaths, webgpu: false });
 console.log("provider:", voice.provider, "sample rate:", voice.sampleRate);
 
 const result = await synthesize(voice, entry.sampleText);
+const peak = result.samples.reduce((max, s) => Math.max(max, Math.abs(s)), 0);
 console.log("text:", entry.sampleText);
-console.log("seconds:", (result.samples.length / result.sampleRate).toFixed(2));
+console.log("peak:", peak);
 
 const wav = encodeWav(result.samples, result.sampleRate);
 await writeFile("out.wav", Buffer.from(await wav.arrayBuffer()));
-console.log("wrote out.wav,", wav.size, "bytes");
+console.log("out.wav:", wav.type, (wav.size - 44) / result.samples.length, "bytes per sample");
 ```
 
 ```text
 provider: wasm sample rate: 22050
 text: Olá! Esta voz corre no teu navegador, sem servidores.
-seconds: 3.38
-wrote out.wav, 149036 bytes
+peak: 1
+out.wav: audio/wav 2 bytes per sample
 ```
 
 The voice model downloads from Hugging Face. [Getting started](docs/getting-started.md) gives the same steps for a browser page.

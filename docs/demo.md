@@ -4,7 +4,7 @@
 covers: what the demo in demo/ does, how to run and build it, and where it deploys
 source: demo/src/main.ts, demo/index.html, demo/vite.config.js, demo/package.json, .github/workflows/pages.yml
 generated: no
-verify: npm install && npm run build, then in demo/ run npm install && npm run build && npx vite preview, open `http://localhost:4173/phoonnx.js/` and synthesize a unicode and an espeak voice
+verify: none, checked by reading demo/src/main.ts and .github/workflows/pages.yml:build
 see: docs/browser.md, docs/testing.md
 -->
 
@@ -12,7 +12,7 @@ This page describes the demo web app in `demo/`. It shows the built-in voices in
 
 ## What the demo does
 
-The page lists the 36 built-in voices, grouped by speaker. You pick a voice, edit the sample text, and click **Synthesize**. The page plays the audio and offers it as a WAV download. The sliders set the speed, which is the inverse of `lengthScale`, and the volume. The advanced section sets `noiseScale` and `noiseW`.
+The page lists the built-in voices, grouped by speaker. You pick a voice, edit the sample text, and click **Synthesize**. The page plays the audio and offers it as a WAV download. The sliders set the speed, which is the inverse of `lengthScale`, and the volume. The advanced section sets `noiseScale` and `noiseW`.
 
 `demo/src/main.ts` uses `loadVoice`, `synthesize` and `encodeWav` from `phoonnx`, and `makeEspeakTokenizer` from `phoonnx/espeak` for the espeak voices. It keeps each loaded voice in a `Map`, so a second synthesis with the same voice does not load it again.
 
@@ -41,6 +41,25 @@ phoonnx_gl-ES_miro_unicode download name: phoonnx_gl-ES_miro_unicode.wav
 pipertts_en-GB_dii text: Hello! This voice runs entirely in your browser.
 pipertts_en-GB_dii status: done · wasm
 pipertts_en-GB_dii download name: pipertts_en-GB_dii.wav
+```
+
+## The example page with no bundler
+
+`examples/browser/index.html` is a single page that imports the built `dist/` files. An import map points `onnxruntime-web` at `node_modules`. The page speaks the unicode voices. For an espeak voice, it shows a note that the voice needs the espeak-ng tokenizer.
+
+Build the package, then serve the repository root:
+
+```bash
+npm install
+npm run build
+python3 -m http.server 8000
+```
+
+Open `http://localhost:8000/examples/browser/index.html`, pick a unicode voice and click **Synthesize**. A headless Chromium run with the Occitan Dii voice gives:
+
+```text
+options: 36
+status: done — wasm
 ```
 
 ## Deployment

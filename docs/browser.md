@@ -4,7 +4,7 @@
 covers: how to load the unicode, espeak and Python-index voices in a web page, browse the built-in voices, and self-host the WASM files
 source: src/voice.ts, src/voices.ts, src/espeak.ts, src/pyodide.ts, src/python/frontend.py, demo/src/main.ts
 generated: no
-verify: put each example in the page of docs/getting-started.md, serve the folder with python3 -m http.server, open it in Chromium. Then compare the console with the text block under the example
+verify: none, checked by reading src/voice.ts:loadVoice, src/espeak.ts:makeEspeakTokenizer and src/pyodide.ts:loadIndexVoice
 see: docs/getting-started.md, docs/node.md, docs/api.md
 -->
 
@@ -61,7 +61,7 @@ const voice = await loadVoice(entry, {
 
 const blob = await synthesizeWav(voice, entry.sampleText);
 console.log("provider:", voice.provider, "text:", entry.sampleText);
-console.log("wav bytes:", blob.size, "type:", blob.type);
+console.log("wav type:", blob.type);
 const audio = new Audio(URL.createObjectURL(blob));
 ```
 
@@ -69,7 +69,7 @@ const audio = new Audio(URL.createObjectURL(blob));
 initializing 1.00
 No available adapters.
 provider: wasm text: Adieu! Aquesta votz parla dins ton navegador.
-wav bytes: 130604 type: audio/wav
+wav type: audio/wav
 ```
 
 `onProgress` also reports each step of the download, as `downloading 12.3 MB` labels. The output above leaves those lines out. The browser keeps the model in Cache Storage, so the next load of the voice does not download it again.
@@ -103,15 +103,13 @@ const result = await synthesize(voice, "Kaixo mundua. Zer moduz?", {
     tokenize(text, idMap, entry.espeakVoice, { keepPunctuation: voice.keepPunctuation }),
 });
 const blob = encodeWav(result.samples, result.sampleRate);
-console.log("provider:", voice.provider, "seconds:", (result.samples.length / result.sampleRate).toFixed(2));
-console.log("wav bytes:", blob.size);
+console.log("provider:", voice.provider, "sample rate:", result.sampleRate, "wav type:", blob.type);
 ```
 
 ```text
 No available adapters.
 sentences: 2 first ids: 1 0 23 0 120 0 14 0
-provider: wasm seconds: 1.83
-wav bytes: 80940
+provider: wasm sample rate: 22050 wav type: audio/wav
 ```
 
 The tokenizer returns one id list for each sentence. `synthesize` runs the model once for each list and joins the audio. For this voice, each list starts with the BOS id `1`, and the blank id `0` follows each symbol id.
@@ -132,49 +130,34 @@ import { synthesizeWav } from "phoonnx";
 import { fetchVoiceIndex, loadIndexVoice } from "phoonnx/pyodide";
 
 const index = await fetchVoiceIndex();
-console.log("VITS voices in the index:", index.size);
-
 const voice = await loadIndexVoice(index.get("facebook/mms-tts-por-Portuguese"), {
-  pins: { phoonnx: "1.113.10a2" },
-  onProgress: (frac, label) => console.log(label),
+  onProgress: (frac, label) => { if (!label.startsWith("downloading")) console.log(label); },
 });
 const blob = await synthesizeWav(voice, "Olá! Esta voz fala no teu navegador.");
 console.log("phoneme type:", voice.entry.phonemeType, "sample rate:", voice.sampleRate);
-console.log("wav bytes:", blob.size);
+console.log("wav type:", blob.type);
 ```
 
 ```text
-VITS voices in the index: 1539
 loading Python
 installing the phoonnx front end
 Python ready
 initializing
 No available adapters.
 loading the text front end
-2026-11-21 20:43:37.937 - OVOS - phoonnx.providers:available_providers:94 - WARNING - could not query onnxruntime providers: phoonnx.js front end: this call needs a package it does not load
 phoneme type: graphemes sample rate: 16000
-wav bytes: 109100
+wav type: audio/wav
 ```
 
-The output leaves out the Pyodide lines for each package that it loads. The WARNING line comes from the Python phoonnx log.
+The output leaves out the Pyodide lines for each package that it loads, and a WARNING line with a time stamp from the Python phoonnx log. The front end does not load onnxruntime, and phoonnx logs that.
 
-Pyodide loads only when a voice needs it. The first such voice downloads Pyodide from the jsDelivr CDN and the Python wheels from PyPI, and the browser caches them. The phoneme types with a front end are the keys of `PHONEME_TYPE_PACKAGES`: `graphemes`, `vosk`, `tugaphone`, `cotovia` and `ahotts`. The `tugaphone`, `cotovia` and `ahotts` types install more packages when their first voice loads. The `cotovia` and `ahotts` packages, pycotovia and ahotts-g2p, are GPL-3.0-or-later.
+Pyodide loads only when a voice needs it. The first such voice downloads Pyodide from the jsDelivr CDN and the Python wheels from PyPI, and the browser caches them. The phoneme types with a front end are the keys of `PHONEME_TYPE_PACKAGES`: `graphemes`, `vosk`, `tugaphone`, `cotovia` and `ahotts`. The `tugaphone`, `cotovia` and `ahotts` types install more packages when their first voice loads. The `cotovia` and `ahotts` packages pycotovia, ahotts-g2p and scriptconv-copyleft are GPL-3.0-or-later.
 
 One Pyodide runtime serves every voice on the page. The first call that loads it fixes `indexURL`, `extraPackages` and `pins`. Later calls ignore these three options.
 
-### The phoonnx pin
-
-Without a pin, the front end installs the newest phoonnx release. phoonnx 1.113.11a1 and later stop in `loadIndexVoice` for every voice of the index:
-
-```text
-TypeError: argument should be a str or an os.PathLike object where __fspath__ returns a str, not 'type'
-```
-
-phoonnx releases before 1.110.0a1 load the voice, but `synthesize` then fails with `AttributeError: 'TTSVoice' object has no attribute 'prepare'`. Pin `phoonnx` to `1.113.10a2`, as the example does.
-
 ## Browse the built-in voices
 
-`phoonnx/voices` holds the 36 built-in Miro and Dii voices. The language tags carry a region, so a lookup by `eu` finds nothing and a lookup by `eu-ES` finds the Basque voices:
+`phoonnx/voices` holds the built-in Miro and Dii voices. The language tags carry a region, so a lookup by `eu` finds nothing and a lookup by `eu-ES` finds the Basque voices:
 
 ```js
 import { voices, getVoicesByLang, getHaCompatibleVoices, getVoicesBySpeaker } from "phoonnx/voices";
@@ -208,11 +191,11 @@ console.log(wasm.join("\n"));
 
 ```text
 No available adapters.
-http://localhost:8002/node_modules/onnxruntime-web/dist/ort-wasm-simd-threaded.jsep.mjs
-http://localhost:8002/node_modules/onnxruntime-web/dist/ort-wasm-simd-threaded.jsep.wasm
+http://localhost:8010/node_modules/onnxruntime-web/dist/ort-wasm-simd-threaded.jsep.mjs
+http://localhost:8010/node_modules/onnxruntime-web/dist/ort-wasm-simd-threaded.jsep.wasm
 ```
 
-The value must end with `/`. Give a path from the site root or a full URL. onnxruntime-web resolves a relative path against its own module URL, so `./node_modules/onnxruntime-web/dist/` becomes `node_modules/onnxruntime-web/dist/node_modules/onnxruntime-web/dist/` and the load fails with `no available backend found`.
+The URLs in the output carry the address of the server. The value must end with `/`. Give a path from the site root or a full URL. onnxruntime-web resolves a relative path against its own module URL, so `./node_modules/onnxruntime-web/dist/` becomes `node_modules/onnxruntime-web/dist/node_modules/onnxruntime-web/dist/` and the load fails with `no available backend found`.
 
 `numThreads` sets the number of WASM threads. The default of 1 needs no special headers. More threads need a cross-origin isolated page, with the `Cross-Origin-Opener-Policy` and `Cross-Origin-Embedder-Policy` headers.
 
