@@ -1,6 +1,6 @@
 # phoonnx.js: agent guide
 
-phoonnx.js is a TypeScript library that runs phoonnx and Piper VITS voices with onnxruntime-web, in a browser or in Node. For a text with no digits, dates or abbreviations, its unicode and espeak tokenizers give the same token ids as the Python phoonnx library. They do not expand numbers or apply phonetic spellings ([api.md](docs/api.md#tokenizeunicodetext-idmap-options)). The documentation index is [docs/index.md](docs/index.md).
+phoonnx.js is a TypeScript library that runs phoonnx and Piper VITS voices with onnxruntime-web, in a browser or in Node. For a text with no digits, dates, abbreviations or words that the language respells, its unicode and espeak tokenizers give the same token ids as the Python phoonnx library. They do not expand numbers or apply phonetic spellings ([api.md](docs/api.md#tokenizeunicodetext-idmap-options)). The documentation index is [docs/index.md](docs/index.md).
 
 ## Repository map
 

@@ -10,12 +10,12 @@ see: docs/index.md, docs/getting-started.md
 
 phoonnx.js runs VITS text-to-speech voices with [onnxruntime-web](https://www.npmjs.com/package/onnxruntime-web), in a browser or in Node. The model runs on the machine of the user, so the library needs no speech server and no API key.
 
-Its unicode and espeak tokenizers split the text into sentences as the Python [TigreGotico/phoonnx](https://github.com/TigreGotico/phoonnx) library does. For a text with no digits, dates or abbreviations, they give the same token ids. They do not expand numbers or apply phonetic spellings, so other text can give other ids ([api.md](docs/api.md#tokenizeunicodetext-idmap-options)). The Pyodide voices run the Python front end, which does both steps. The phoneme type of a voice selects the tokenizer:
+Its unicode and espeak tokenizers split the text into sentences as the Python [TigreGotico/phoonnx](https://github.com/TigreGotico/phoonnx) library does. For a text with no digits, dates, abbreviations or words that the language respells, they give the same token ids. They do not expand numbers or apply phonetic spellings, so other text can give other ids ([api.md](docs/api.md#tokenizeunicodetext-idmap-options)). The Pyodide voices run the Python front end, which does both steps. The phoneme type of a voice selects the tokenizer:
 
 | Phoneme type | Voices | Tokenizer |
 |---|---|---|
 | `unicode` | The Miro and Dii unicode voices | NFD normalization, then one id for each codepoint |
-| `espeak` | The Miro and Dii espeak voices and the pt-PT voices Voice 3 and Voice 4. All of them are Piper voices | espeak-ng in WebAssembly turns the text into IPA, then one id for each symbol |
+| `espeak` | The Miro and Dii espeak voices and the pt-PT voices Voice 3 and Voice 4. Each one also loads in Piper | espeak-ng in WebAssembly turns the text into IPA, then one id for each symbol |
 | `graphemes`, `vosk`, `tugaphone`, `cotovia`, `ahotts` | Meta MMS, Coqui grapheme VITS, vosk-tts, Miro and Dii tugaphone, and the Galician, Basque and Spanish VITS voices of Proxecto Nós and HiTZ | The Python phoonnx front end, run in [Pyodide](https://pyodide.org) |
 
 The same `.onnx` file of an espeak voice runs in phoonnx.js, in Python phoonnx, in Piper and in Home Assistant.
