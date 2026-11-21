@@ -27,6 +27,13 @@
   <div id="status"></div>
   <audio id="player" controls hidden></audio>
 
+  <script type="importmap">
+  {
+    "imports": {
+      "onnxruntime-web": "../../node_modules/onnxruntime-web/dist/ort.bundle.min.mjs"
+    }
+  }
+  </script>
   <script type="module">
     // In a real project: import from "phoonnx" and "phoonnx/voices"
     // Here we import the built dist directly for the example.
