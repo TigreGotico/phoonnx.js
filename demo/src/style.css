@@ -1,6 +1,16 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+@config "../tailwind.config.js";
+
+/* Tailwind 4 draws borders in currentColor; keep the Tailwind 3 default the design relies on. */
+@layer base {
+  *,
+  ::after,
+  ::before,
+  ::backdrop,
+  ::file-selector-button {
+    border-color: var(--color-gray-200, currentColor);
+  }
+}
 
 @layer base {
   :root {
@@ -58,18 +68,18 @@
 }
 
 @layer components {
-  .btn {
+  .btn, .btn-primary, .btn-ghost {
     @apply relative inline-flex items-center justify-center gap-2 rounded-lg px-5 py-2.5 text-sm font-semibold transition-all duration-200;
   }
   .btn-primary {
-    @apply btn text-primary-fg;
+    @apply text-primary-fg;
     background: var(--gradient-brand);
     background-size: 160% 160%;
     box-shadow: var(--shadow-glow);
   }
   .btn-primary:hover { background-position: 100% 0; transform: translateY(-1px); }
   .btn-primary:disabled { opacity: 0.6; cursor: default; transform: none; }
-  .btn-ghost { @apply btn border border-border bg-surface/60 text-fg backdrop-blur; }
+  .btn-ghost { @apply border border-border bg-surface/60 text-fg backdrop-blur; }
   .btn-ghost:hover { @apply border-primary/60 text-primary; transform: translateY(-1px); }
 
   .card {
