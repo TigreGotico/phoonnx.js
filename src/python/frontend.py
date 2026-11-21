@@ -50,6 +50,18 @@ def _stub(*names: str) -> None:
 _stub("onnxruntime", "requests", "huggingface_hub.constants", "huggingface_hub.errors",
       "json_database")
 
+_hub_constants = sys.modules["huggingface_hub.constants"]
+if isinstance(_hub_constants, _StubModule):
+    # phoonnx builds paths from HF_HUB_CACHE and tests HF_HUB_OFFLINE when it loads a voice.
+    _hub_constants.HF_HUB_CACHE = "/phoonnx-js/hf-cache"
+    _hub_constants.HF_HUB_OFFLINE = True
+
+_hub_errors = sys.modules["huggingface_hub.errors"]
+if isinstance(_hub_errors, _StubModule):
+    # phoonnx names these classes in an except clause, which needs real exceptions.
+    for _name in ("EntryNotFoundError", "LocalEntryNotFoundError", "OfflineModeIsEnabled"):
+        setattr(_hub_errors, _name, type(_name, (Exception,), {}))
+
 from phoonnx import model_manager, voice as voice_module  # noqa: E402
 from phoonnx.engines import get_adapter  # noqa: E402
 
