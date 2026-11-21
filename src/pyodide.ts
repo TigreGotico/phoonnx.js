@@ -63,17 +63,18 @@ const PYODIDE_PACKAGES = ["numpy", "regex", "python-dateutil", "pytz"];
 /**
  * Extra PyPI packages per phoneme type, installed when the first voice of
  * that type loads. A phoneme type that is not a key here has no browser route
- * in phoonnx.js. pycotovia (`cotovia`) and ahotts-g2p (`ahotts`) are
- * GPL-3.0-or-later.
+ * in phoonnx.js. pycotovia (`cotovia`), ahotts-g2p (`ahotts`) and
+ * scriptconv-copyleft are GPL-3.0-or-later.
  */
 export const PHONEME_TYPE_PACKAGES: Record<string, string[]> = {
   graphemes: [],
   vosk: [],
   tugaphone: [
     "tugaphone", "silabificador", "tugalex", "bifonia", "orthography2ipa", "o2i-lexicons",
+    "desacordo-ortografico",
   ],
-  cotovia: ["pycotovia"],
-  ahotts: ["ahotts-g2p"],
+  cotovia: ["pycotovia", "scriptconv-copyleft"],
+  ahotts: ["ahotts-g2p", "scriptconv-copyleft"],
 };
 
 function hasFrontend(phonemeType: string): boolean {

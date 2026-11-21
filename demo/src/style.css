@@ -1,6 +1,16 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+@config "../tailwind.config.js";
+
+/* Tailwind 4 draws borders in currentColor; keep the Tailwind 3 default the design relies on. */
+@layer base {
+  *,
+  ::after,
+  ::before,
+  ::backdrop,
+  ::file-selector-button {
+    border-color: var(--color-gray-200, currentColor);
+  }
+}
 
 @layer base {
   :root {
@@ -43,6 +53,7 @@
     --shadow-glow: 0 0 0 1px rgb(var(--grad-via) / 0.3), 0 24px 60px -24px rgb(var(--grad-via) / 0.55);
   }
 
+  button:not(:disabled), [role="button"]:not(:disabled) { cursor: pointer; }
   html { scroll-behavior: smooth; }
   body {
     @apply bg-bg text-fg font-sans antialiased;
@@ -54,22 +65,22 @@
   }
   h1, h2, h3 { @apply font-serif; letter-spacing: -0.012em; }
   ::selection { background: rgb(var(--grad-via) / 0.28); }
-  :focus-visible { @apply outline-none ring-2 ring-primary ring-offset-2 ring-offset-bg; }
+  :focus-visible { @apply outline-hidden ring-2 ring-primary ring-offset-2 ring-offset-bg; }
 }
 
 @layer components {
-  .btn {
+  .btn, .btn-primary, .btn-ghost {
     @apply relative inline-flex items-center justify-center gap-2 rounded-lg px-5 py-2.5 text-sm font-semibold transition-all duration-200;
   }
   .btn-primary {
-    @apply btn text-primary-fg;
+    @apply text-primary-fg;
     background: var(--gradient-brand);
     background-size: 160% 160%;
     box-shadow: var(--shadow-glow);
   }
   .btn-primary:hover { background-position: 100% 0; transform: translateY(-1px); }
   .btn-primary:disabled { opacity: 0.6; cursor: default; transform: none; }
-  .btn-ghost { @apply btn border border-border bg-surface/60 text-fg backdrop-blur; }
+  .btn-ghost { @apply border border-border bg-surface/60 text-fg backdrop-blur; }
   .btn-ghost:hover { @apply border-primary/60 text-primary; transform: translateY(-1px); }
 
   .card {

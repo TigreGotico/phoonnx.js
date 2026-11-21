@@ -20,9 +20,9 @@
  * });
  * ```
  *
- * @example CDN / vanilla JS — load wasm from CDN
+ * @example Vanilla JS, no bundler — phoonnx.js from node_modules, espeak-ng from a CDN
  * ```js
- * const { makeEspeakTokenizer } = await import("https://esm.sh/phoonnx/espeak");
+ * const { makeEspeakTokenizer } = await import("./node_modules/phoonnx/dist/espeak.js");
  * const espeakFactory = (await import("https://esm.sh/espeak-ng")).default;
  * const tokenize = makeEspeakTokenizer(espeakFactory, "https://esm.sh/espeak-ng/dist/espeak-ng.wasm");
  * ```
