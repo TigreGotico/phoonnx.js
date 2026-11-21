@@ -1,6 +1,6 @@
 # phoonnx.js: agent guide
 
-phoonnx.js is a TypeScript library that runs phoonnx and Piper VITS voices with onnxruntime-web, in a browser or in Node. Its tokenizers give the same token ids as the Python phoonnx library. The documentation index is [docs/index.md](docs/index.md).
+phoonnx.js is a TypeScript library that runs phoonnx and Piper VITS voices with onnxruntime-web, in a browser or in Node. For a text with no digits, dates or abbreviations, its unicode and espeak tokenizers give the same token ids as the Python phoonnx library. They do not expand numbers or apply phonetic spellings ([api.md](docs/api.md#tokenizeunicodetext-idmap-options)). The documentation index is [docs/index.md](docs/index.md).
 
 ## Repository map
 
@@ -40,7 +40,7 @@ npm run test:browser
 
 ## Hard rules
 
-1. The unicode and espeak tokenizers give the token ids of Python phoonnx. `test/id_parity.test.ts` checks each row of the shared fixture. Python phoonnx owns that fixture, and `test/id_parity_fixture.mjs` pins its commit ([testing.md](docs/testing.md#the-ci-checks)).
+1. The unicode and espeak tokenizers give the token ids of Python phoonnx for each row of the shared fixture. `test/id_parity.test.ts` checks these rows, which hold no digits. Python phoonnx owns that fixture, and `test/id_parity_fixture.mjs` pins its commit ([testing.md](docs/testing.md#the-ci-checks)).
 2. The super-resolution DSP matches the Python `audiosronnx` values. `test/dsp.test.ts` checks them against `test/fixtures/dsp_fixtures.json`, which `test/fixtures/gen_fixtures.py` writes ([super-resolution.md](docs/super-resolution.md#engines)).
 3. `onnxruntime-web` is a peer dependency, and the caller supplies `espeak-ng`. `tsup.config.ts` keeps both out of the bundle ([api.md](docs/api.md)).
 4. Super-resolution is off by default, and its default engine is `novasr`, as in Python phoonnx. A failed or unknown engine gives native-rate audio and a warning. `test/superres.test.ts` and `test/synthesize.test.ts` check this ([super-resolution.md](docs/super-resolution.md#how-it-runs)).

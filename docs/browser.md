@@ -4,7 +4,7 @@
 covers: how to load the unicode, espeak and Python-index voices in a web page, browse the built-in voices, and self-host the WASM files
 source: src/voice.ts, src/voices.ts, src/espeak.ts, src/pyodide.ts, src/python/frontend.py, demo/src/main.ts
 generated: no
-verify: none, checked by reading src/voice.ts:loadVoice, src/espeak.ts:makeEspeakTokenizer and src/pyodide.ts:loadIndexVoice
+verify: npm run build >/dev/null && diff <(node --input-type=module -e "$(awk -v n=5 '/^\140\140\140/{f=0} $0=="\140\140\140js"{c++} $0=="\140\140\140js"&&c==n{f=2} f==1{print} f==2{f=1}' docs/browser.md)" 2>&1) <(awk -v n=4 '/^\140\140\140/{f=0} $0=="\140\140\140text"{c++} $0=="\140\140\140text"&&c==n{f=2} f==1{print} f==2{f=1}' docs/browser.md)
 see: docs/getting-started.md, docs/node.md, docs/api.md
 -->
 
@@ -149,15 +149,15 @@ phoneme type: graphemes sample rate: 16000
 wav type: audio/wav
 ```
 
-The output leaves out the Pyodide lines for each package that it loads, and a WARNING line with a time stamp from the Python phoonnx log. The front end does not load onnxruntime, and phoonnx logs that.
+The output leaves out the two summary lines of Pyodide, `Loading …` and `Loaded …`, and a WARNING line with a time stamp from the Python phoonnx log. The front end does not load onnxruntime, and phoonnx logs that.
 
-Pyodide loads only when a voice needs it. The first such voice downloads Pyodide from the jsDelivr CDN and the Python wheels from PyPI, and the browser caches them. The phoneme types with a front end are the keys of `PHONEME_TYPE_PACKAGES`: `graphemes`, `vosk`, `tugaphone`, `cotovia` and `ahotts`. The `tugaphone`, `cotovia` and `ahotts` types install more packages when their first voice loads. The `cotovia` and `ahotts` packages pycotovia, ahotts-g2p and scriptconv-copyleft are GPL-3.0-or-later.
+Pyodide loads only when a voice needs it. The first such voice downloads Pyodide from the jsDelivr CDN and the Python wheels from PyPI, and the browser caches them. The phoneme types with a front end are the keys of `PHONEME_TYPE_PACKAGES`: `graphemes`, `vosk`, `tugaphone`, `cotovia` and `ahotts`. The `tugaphone`, `cotovia` and `ahotts` types install more packages when their first voice loads. The `cotovia` and `ahotts` types install pycotovia, ahotts-g2p and scriptconv-copyleft. pycotovia and ahotts-g2p are GPL-3.0-or-later. On PyPI, scriptconv-copyleft declares the licence expression `Apache-2.0 AND GPL-3.0-only AND GPL-3.0-or-later AND CC-BY-4.0`.
 
 One Pyodide runtime serves every voice on the page. The first call that loads it fixes `indexURL`, `extraPackages` and `pins`. Later calls ignore these three options.
 
 ## Browse the built-in voices
 
-`phoonnx/voices` holds the built-in Miro and Dii voices. The language tags carry a region, so a lookup by `eu` finds nothing and a lookup by `eu-ES` finds the Basque voices:
+`phoonnx/voices` holds the built-in voices: the Miro and Dii voices, and the pt-PT voices Voice 3 and Voice 4. The language tags carry a region, so a lookup by `eu` finds nothing and a lookup by `eu-ES` finds the Basque voices:
 
 ```js
 import { voices, getVoicesByLang, getHaCompatibleVoices, getVoicesBySpeaker } from "phoonnx/voices";

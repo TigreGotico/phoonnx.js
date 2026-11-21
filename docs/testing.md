@@ -68,12 +68,18 @@ npm run test:browser -- [--audio dir] [--texts tsv] [cases.json] [reference.json
 
 A name selects a case type, such as `graphemes`, or a stage. The cases with `probePackages` test phoneme types that phoonnx.js does not ship, and they run only when you name their type. `--audio dir` saves the audio of each voice as a 16-bit WAV file in `dir`, with `/` in the voice id written as `__`. `--texts tsv` reads a file with the columns `voice` and `text`, and speaks that text in place of the case text. The ids of a replaced text are not compared, because the reference does not have them. `PHOONNX_DIST` selects the build under test, `/dist` by default.
 
-A run of the `graphemes` cases and the `reject` stage gives:
+The command reads the first three positional arguments as the three paths, so a name comes after all three. `npm run test:browser -- reject` reads `reject` as the path of the cases file and fails with `ENOENT`. To run the `graphemes` cases and the `reject` stage, give the three default paths first:
+
+```bash
+npm run test:browser -- test/browser/cases.json test/browser/reference.json test/browser/results.json graphemes reject
+```
+
+The output is:
 
 ```text
-graphemes	facebook/mms-tts-eng-English	PASS	idsEqual=true versionsMatch=true lazyInstall=true samples=84224 peak=1.000 rms=0.1363 ready=17.8s
-graphemes	facebook/mms-tts-por-Portuguese	PASS	idsEqual=true versionsMatch=true lazyInstall=true samples=54784 peak=1.000 rms=0.1608 ready=16.5s
-graphemes	coqui/bg-cv-vits	PASS	idsEqual=true versionsMatch=true lazyInstall=true samples=23040 peak=1.000 rms=0.1925 ready=14.5s
+graphemes	facebook/mms-tts-eng-English	PASS	idsEqual=true versionsMatch=true lazyInstall=true samples=84480 peak=1.000 rms=0.1348 ready=21.4s
+graphemes	facebook/mms-tts-por-Portuguese	PASS	idsEqual=true versionsMatch=true lazyInstall=true samples=55296 peak=1.000 rms=0.1636 ready=17.1s
+graphemes	coqui/bg-cv-vits	PASS	idsEqual=true versionsMatch=true lazyInstall=true samples=23296 peak=1.000 rms=0.1957 ready=17.0s
 reject	PASS	OpenVoiceOS/phoonnx_oc_miro_unicode outcome=rejected requests=0 Error: phoneme type "unicode" has no browser front end in phoonnx.js
 ALL PASSED
 ```

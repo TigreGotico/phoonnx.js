@@ -134,7 +134,7 @@ interface LoadedVoice {
 
 ## phoonnx/voices
 
-`phoonnx/voices` holds the Miro and Dii voices that TigreGóticoLda trained, as a `VoiceEntry[]`:
+`phoonnx/voices` holds the built-in voices as a `VoiceEntry[]`. These are the Miro and Dii voices that TigreGóticoLda trained, and the pt-PT espeak voices Voice 3 and Voice 4:
 
 | Export | Returns |
 |---|---|
@@ -171,7 +171,7 @@ interface VoiceEntry {
   => Promise<number[][]>
 ```
 
-`espeakFactory` is the default export of the `espeak-ng` package. `wasmUrl` is the location of `espeak-ng.wasm`: a URL in a browser, a file path in Node. Without `espeakVoice`, the function throws an error. The sentence, clause and punctuation rules are the rules of `tokenizeUnicode`. espeak-ng reads each clause alone and gives its IPA symbols.
+`espeakFactory` is the default export of the `espeak-ng` package. `wasmUrl` is the location of `espeak-ng.wasm`: a URL in a browser, a file path in Node. Without `espeakVoice`, the function throws an error. The sentence, clause and punctuation rules are the rules of `tokenizeUnicode`. espeak-ng reads each clause alone and gives its IPA symbols. As with `tokenizeUnicode`, the text does not get the number expansion and phonetic spellings of Python phoonnx.
 
 `tokenizeEspeak(text, espeakVoice, idMap, espeakFactory, wasmUrl, options?)` is the same tokenizer with all arguments in one call.
 
@@ -198,13 +198,13 @@ interface PyodideFrontendOptions {
 }
 ```
 
-Every package without a pin installs at its newest release, prereleases included. `loadPyodideFrontend` returns a `PyodideFrontend`, and its `loadVoice` returns the `FrontendVoiceInfo` that the Python front end read from the voice config. The first call that loads Pyodide fixes `indexURL`, `extraPackages` and `pins`. Later calls ignore these three options.
+micropip installs each PyPI package without a pin at its newest release, prereleases included. micropip, numpy, regex, python-dateutil, pytz and six come from the Pyodide distribution of `PYODIDE_VERSION` instead. They install at the version of that distribution, and `pins` cannot change them. `loadPyodideFrontend` returns a `PyodideFrontend`, and its `loadVoice` returns the `FrontendVoiceInfo` that the Python front end read from the voice config. The first call that loads Pyodide fixes `indexURL`, `extraPackages` and `pins`. Later calls ignore these three options.
 
 `loadIndexVoice` throws an error before any download when the entry is not a single-graph VITS voice, or when its phoneme type is not a key of `PHONEME_TYPE_PACKAGES`.
 
 ## Phoneme alignments
 
-A model exported with `phoonnx-train export-onnx --add-phoneme-alignment` has a second output that holds the duration of each token. With `includeAlignments: true`, `synthesize` turns it into one `{ phoneme, numSamples }` entry for each phoneme:
+A model exported with `python -m phoonnx_train.export_onnx model.ckpt --config config.json --add-phoneme-alignment` has a second output that holds the duration of each token. With `includeAlignments: true`, `synthesize` turns it into one `{ phoneme, numSamples }` entry for each phoneme:
 
 ```ts
 const result = await synthesize(voice, "Hello!", { includeAlignments: true });

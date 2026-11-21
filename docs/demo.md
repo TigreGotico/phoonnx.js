@@ -4,7 +4,7 @@
 covers: what the demo in demo/ does, how to run and build it, and where it deploys
 source: demo/src/main.ts, demo/index.html, demo/vite.config.js, demo/package.json, .github/workflows/pages.yml
 generated: no
-verify: none, checked by reading demo/src/main.ts and .github/workflows/pages.yml:build
+verify: npm run build >/dev/null && n=$(node -e 'import("phoonnx/voices").then((m) => console.log(m.voices.length))') && grep -qx "voices in the menu: $n" docs/demo.md && grep -qx "options: $n" docs/demo.md
 see: docs/browser.md, docs/testing.md
 -->
 
@@ -12,7 +12,7 @@ This page describes the demo web app in `demo/`. It shows the built-in voices in
 
 ## What the demo does
 
-The page lists the built-in voices, grouped by speaker. You pick a voice, edit the sample text, and click **Synthesize**. The page plays the audio and offers it as a WAV download. The sliders set the speed, which is the inverse of `lengthScale`, and the volume. The advanced section sets `noiseScale` and `noiseW`.
+The page lists every built-in voice, grouped by speaker. You pick a voice, edit the sample text, and click **Synthesize**. The page plays the audio and offers it as a WAV download. The sliders set the speed, which is the inverse of `lengthScale`, and the volume. The advanced section sets `noiseScale` and `noiseW`.
 
 `demo/src/main.ts` uses `loadVoice`, `synthesize` and `encodeWav` from `phoonnx`, and `makeEspeakTokenizer` from `phoonnx/espeak` for the espeak voices. It keeps each loaded voice in a `Map`, so a second synthesis with the same voice does not load it again.
 
@@ -45,7 +45,7 @@ pipertts_en-GB_dii download name: pipertts_en-GB_dii.wav
 
 ## The example page with no bundler
 
-`examples/browser/index.html` is a single page that imports the built `dist/` files. An import map points `onnxruntime-web` at `node_modules`. The page speaks the unicode voices. For an espeak voice, it shows a note that the voice needs the espeak-ng tokenizer.
+`examples/browser/index.html` is a single page that imports the built `dist/` files and lists every built-in voice. An import map points `onnxruntime-web` at `node_modules`. The page speaks the unicode voices. For an espeak voice, it shows a note that the voice needs the espeak-ng tokenizer.
 
 Build the package, then serve the repository root:
 

@@ -134,7 +134,7 @@ Loaded micropip, numpy, python-dateutil, pytz, regex, six
 mms.wav: audio/wav 16000 Hz
 ```
 
-Pyodide prints the two `Loading` lines. On the first run, it also prints two lines for each package that it downloads from the jsDelivr CDN, and it keeps a copy in `node_modules/pyodide/`. Python phoonnx logs a WARNING line, with a time stamp, because the front end does not load onnxruntime. The output above leaves out the download lines and the WARNING line.
+Pyodide prints one `Loading` line and one `Loaded` line. On the first run, it also prints two lines for each package that it downloads from the jsDelivr CDN, and it keeps a copy in `node_modules/pyodide/`. Python phoonnx logs a WARNING line, with a time stamp, because the front end does not load onnxruntime. The output above leaves out the download lines and the WARNING line.
 
 ---
 [Index](index.md) · [← Using a voice in the browser](browser.md) · [API reference →](api.md)
