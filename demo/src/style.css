@@ -53,6 +53,7 @@
     --shadow-glow: 0 0 0 1px rgb(var(--grad-via) / 0.3), 0 24px 60px -24px rgb(var(--grad-via) / 0.55);
   }
 
+  button:not(:disabled), [role="button"]:not(:disabled) { cursor: pointer; }
   html { scroll-behavior: smooth; }
   body {
     @apply bg-bg text-fg font-sans antialiased;
@@ -64,7 +65,7 @@
   }
   h1, h2, h3 { @apply font-serif; letter-spacing: -0.012em; }
   ::selection { background: rgb(var(--grad-via) / 0.28); }
-  :focus-visible { @apply outline-none ring-2 ring-primary ring-offset-2 ring-offset-bg; }
+  :focus-visible { @apply outline-hidden ring-2 ring-primary ring-offset-2 ring-offset-bg; }
 }
 
 @layer components {
