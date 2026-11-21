@@ -18,7 +18,7 @@ from phoonnx.model_manager import TTSModelManager
 # The packages phoonnx.js installs for every voice (BASE_PACKAGES in src/pyodide.ts).
 BASE = ["phoonnx", "scriptconv", "quebra-frases", "linguatag", "langcodes",
         "ovos-number-parser", "unicode-rbnf", "ovos-date-parser", "chronologia",
-        "ovos-spec-tools", "ovos-utils", "dateparser", "tzlocal"]
+        "ovos-spec-tools", "ovos-utils", "dateparser", "tzlocal", "numtag", "text2spoken"]
 
 
 def versions(names):
