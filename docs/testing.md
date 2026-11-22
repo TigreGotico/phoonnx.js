@@ -2,7 +2,7 @@
 
 <!-- agent-hint
 covers: the checks that CI runs, the Node unit tests, the headless browser test against Python phoonnx, and how the reference files are made
-source: package.json:scripts, .github/workflows/ci.yml, test/*.test.ts, test/id_parity_fixture.mjs, test/browser/run.mjs, test/browser/reference_ids.py, test/fixtures/gen_fixtures.py
+source: package.json:scripts, .github/workflows/ci.yml, test/*.test.ts, test/id_parity_fixture.mjs, test/browser/run.mjs, test/browser/reference_ids.py, test/fixtures/gen_fixtures.py, test/fixtures/gen_sentence_parity.py
 generated: no
 verify: npm test 2>&1 | grep '^ℹ' | grep -v duration_ms | diff - <(awk -v n=1 '/^\140\140\140/{f=0} $0=="\140\140\140text"{c++} $0=="\140\140\140text"&&c==n{f=2} f==1{print} f==2{f=1}' docs/testing.md)
 see: docs/api.md, AGENTS.md
@@ -24,9 +24,9 @@ npm test
 `npm test` runs the Node unit tests in `test/*.test.ts` with `node --import tsx --test`. The summary lines of a run, without the `duration_ms` line, are:
 
 ```text
-ℹ tests 36
+ℹ tests 37
 ℹ suites 0
-ℹ pass 36
+ℹ pass 37
 ℹ fail 0
 ℹ cancelled 0
 ℹ skipped 0
@@ -36,7 +36,7 @@ npm test
 | File | What it checks |
 |---|---|
 | `test/id_parity.test.ts` | The unicode and espeak tokenizers give the same token ids as Python phoonnx, for each row of the shared fixture |
-| `test/frontend.test.ts` | The clause split follows Python scriptconv, and long inputs split in linear time |
+| `test/frontend.test.ts` | The sentence split follows Python quebra_frases, the clause split follows Python scriptconv, and long inputs split in linear time |
 | `test/dsp.test.ts` | The super-resolution DSP matches the Python values in `test/fixtures/dsp_fixtures.json` |
 | `test/superres.test.ts` | The engine registry, the default engine and the warning for an unknown engine |
 | `test/synthesize.test.ts` | Super-resolution inside `synthesize`, with stub ONNX sessions |
@@ -44,6 +44,8 @@ npm test
 Python phoonnx owns the token-id fixture: `tests/fixtures/id_parity.json` in TigreGotico/phoonnx. `test/id_parity_fixture.mjs` downloads it at the commit in `PHOONNX_COMMIT`. To use a local copy, set `PHOONNX_ID_FIXTURE` to its path.
 
 `python test/fixtures/gen_fixtures.py` writes `test/fixtures/dsp_fixtures.json` from the `audiosronnx` Python package. The docstring of the script gives the venv commands.
+
+`python test/fixtures/gen_sentence_parity.py` writes `test/fixtures/sentence_parity.json` from the `quebra-frases` Python package. The file names the quebra-frases version. Its rows hold each text that the sentence tests of quebra_frases use, and texts for each rule of the split. The docstring of the script gives the venv commands.
 
 ## The browser test
 

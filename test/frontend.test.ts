@@ -1,5 +1,10 @@
 /**
- * Tests for the clause split of the text front end.
+ * Tests for the sentence and clause splits of the text front end.
+ *
+ * `fixtures/sentence_parity.json` holds the sentences that Python
+ * quebra_frases's `sentence_tokenize` gives for each input.
+ * `fixtures/gen_sentence_parity.py` writes it; the file names the
+ * quebra_frases version.
  *
  * `fixtures/clause_parity.json` holds the clauses that Python scriptconv's
  * `split_clauses` gives for each input. A script outside this repository
@@ -10,7 +15,19 @@ import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 
-import { phonemeSentences, splitClauses } from "../src/frontend.ts";
+import { phonemeSentences, sentenceTokenize, splitClauses } from "../src/frontend.ts";
+
+const SENTENCE_PARITY = JSON.parse(
+  readFileSync(new URL("./fixtures/sentence_parity.json", import.meta.url), "utf8"),
+) as { rows: Array<[string, string[]]> };
+
+// Every wrong row is listed, not only the first.
+test("sentences are the sentences of Python quebra_frases", () => {
+  const wrong = SENTENCE_PARITY.rows
+    .map(([text, expected]) => ({ text, expected, actual: sentenceTokenize(text) }))
+    .filter(({ expected, actual }) => JSON.stringify(actual) !== JSON.stringify(expected));
+  assert.deepEqual(wrong, [], `${wrong.length} of ${SENTENCE_PARITY.rows.length} rows differ`);
+});
 
 const PARITY = JSON.parse(
   readFileSync(new URL("./fixtures/clause_parity.json", import.meta.url), "utf8"),
@@ -52,16 +69,19 @@ const SHAPES: Record<string, string> = {
   dotWideSpace: (". " + " ".repeat(50)).repeat(N / 52) + "x",
   quotesThenWord: ('"'.repeat(20) + " a").repeat(N / 22),
   dotNewline: ".\n".repeat(N / 2),
+  cjkQuotes: "。" + "」".repeat(N) + " x",
+  closersAfterSpace: "a. " + "»".repeat(N) + "x",
 };
 
-// A child process times each shape, so a split that never ends fails at the
-// deadline instead of hanging the test run.
+// A child process times both splits of each shape, so a split that never ends
+// fails at the deadline instead of hanging the test run.
 const TIME_SHAPES = `
   import { readFileSync } from "node:fs";
-  const { splitClauses } = await import(${JSON.stringify(new URL("../src/frontend.ts", import.meta.url).href)});
+  const { sentenceTokenize, splitClauses } = await import(${JSON.stringify(new URL("../src/frontend.ts", import.meta.url).href)});
   const seconds = {};
   for (const [name, text] of Object.entries(JSON.parse(readFileSync(0, "utf8")))) {
     const start = performance.now();
+    sentenceTokenize(text);
     splitClauses(text);
     seconds[name] = (performance.now() - start) / 1000;
   }
