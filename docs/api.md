@@ -87,7 +87,9 @@ For any other voice with no tokenizer, `synthesize` throws an error that names t
 
 `tokenizeUnicode` is the tokenizer of the unicode voices. It returns a `Promise<number[][]>`, one id list for each sentence.
 
-The text splits into paragraphs, sentences and clauses with the rules of Python phoonnx. A space after `.` or `?` ends a sentence. Each clause loses its punctuation. With `options.keepPunctuation: true`, each clause keeps its clause symbol, one of `. ? ! , : ;`.
+The text splits into paragraphs, sentences and clauses with the rules of Python phoonnx. Each clause loses its punctuation. With `options.keepPunctuation: true`, each clause keeps its clause symbol, one of `. ? ! , : ;`.
+
+The sentence split is the split of quebra_frases `sentence_tokenize`. A sentence ends at a space after a sentence mark of any script, such as `.`, `?`, `!`, `।` or `؟`. A Chinese or Japanese mark (`。`, `？`, `！`) ends a sentence with no space after it. A `.` after an abbreviation (`Dr.`, `e.g.`) or after an ordinal before a lowercase word (`3. de maio`) does not end the sentence. Closing quotes and brackets after the mark stay with the sentence (`« Òc ! » E` splits after `»`).
 
 Each NFD codepoint becomes an id from the `phoneme_id_map` of the voice. A character that the map does not hold takes the ids of its decomposition, or the id of its lowercase form. If neither is in the map, the character is dropped. A blank id goes between the ids, and the BOS and EOS ids wrap each list.
 

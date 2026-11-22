@@ -77,7 +77,7 @@ const tokenize = makeEspeakTokenizer(espeakFactory, espeakWasm);
 const entry = getVoice("pipertts_en-GB_miro");
 const voice = await loadVoice(entry, { wasmPaths, webgpu: false });
 
-const text = "Hello! This voice runs in Node. It reads two sentences.";
+const text = "Hello! This voice runs in Node. It reads three sentences.";
 const options = { keepPunctuation: voice.keepPunctuation };
 const ids = await tokenize(text, voice.idMap, entry.espeakVoice, options);
 console.log("espeak voice:", entry.espeakVoice, "keepPunctuation:", voice.keepPunctuation);
@@ -93,11 +93,11 @@ console.log("espeak.wav:", wav.type, result.sampleRate, "Hz");
 
 ```text
 espeak voice: en-gb-x-rp keepPunctuation: true
-sentences: 2 first ids: 1 0 20 0 59 0 24 0
+sentences: 3 first ids: 1 0 20 0 59 0 24 0
 espeak.wav: audio/wav 22050 Hz
 ```
 
-The text has three sentence ends, but the tokenizer gives two sentences. A space after `.` or `?` ends a sentence, as in Python phoonnx, so `Hello! This voice runs in Node.` is one sentence.
+The text has three sentence ends, and the tokenizer gives three sentences. A space after `.`, `?` or `!` ends a sentence, as in Python phoonnx. A space after `!` does not end the sentence when a lowercase letter follows, as in `Yahoo! and Microsoft`.
 
 ## A voice from the Python voice index
 

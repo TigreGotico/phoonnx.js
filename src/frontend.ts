@@ -8,21 +8,60 @@
  * argument: it takes one clause and returns its phoneme string.
  */
 
-// WORD is Python `re` `\w`; WORD_WITH_MARKS adds marks. `isDigit` is Nd only, `chunkText` `\d` is ASCII.
-const WORD_WITH_MARKS = "\\p{L}\\p{M}\\p{N}_";
+// WORD is Python `re` `\w`. `isDigit` is Nd only, `chunkText` `\d` is ASCII.
 const WORD = "\\p{L}\\p{N}_";
 
-// quebra_frases `_SENTENCE_REGEX`: a space after "." or "?" ends a sentence,
-// except after an abbreviation such as "e.g" or "Dr.".
-const SENTENCE_BREAK = new RegExp(
-  `(?<![${WORD_WITH_MARKS}]\\.[${WORD_WITH_MARKS}][^\\n])(?<![A-Z][a-z]\\.)(?<=\\.|\\?)\\s`,
-  "u",
-);
 // scriptconv `_PARAGRAPH_BREAK`.
 const PARAGRAPH_BREAK = /(\n(?:[^\S\n]*\n)+)/;
 // Python `\s` (`str.isspace`). JavaScript's `\s` lacks U+001C to U+001F and U+0085,
 // and holds U+FEFF.
 const SPACE = "\\t-\\r\\x1c-\\x20\\x85\\xa0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000";
+
+// quebra_frases `_SENTENCE_CLOSE` and `_SENTENCE_SPLIT_CANDIDATE`: a Sentence_Terminal mark and
+// the whitespace after it (group 1), or a Chinese or Japanese mark and its closing quotes before
+// a character that is not space. The `regex` module's `\s` is White_Space, not `str.isspace`.
+// Python looks behind for the Chinese or Japanese mark; the match here takes the mark and its
+// quotes, so a long run of quotes is read once, and the candidate is the end of the match.
+const SENTENCE_CLOSE = `[\\p{Pe}\\p{Pf}"']`;
+const SENTENCE_SPLIT_CANDIDATE = new RegExp(
+  `(?<=\\p{Sentence_Terminal})(?<![\\u104a\\u2024])(\\p{White_Space}+)` +
+    `|[。｡！？︒︕︖﹖﹗]${SENTENCE_CLOSE}*(?!${SENTENCE_CLOSE}|\\p{Sentence_Terminal})(?=\\P{White_Space})`,
+  "gu",
+);
+// quebra_frases `_SPACED_CLOSE`: closing brackets and quotes, then the whitespace after them (group 1).
+const SPACED_CLOSE = /[\p{Pe}\p{Pf}]+(\p{White_Space}+|$)/uy;
+// quebra_frases `_LINE_BREAK`.
+const LINE_BREAK = /[\n\r\v\f\x85\u2028\u2029]/;
+// The letters and apostrophes before lastIndex (group 1): the word `sentence_tokenize` reads before a ".".
+const WORD_BEFORE = /(?<=(?<![\p{L}'])([\p{L}']*))/uy;
+// A digit, spaces, then letters and "/" before lastIndex: the number before a unit ("3 kg", "160 km/h").
+const NUMBER_BEFORE = new RegExp(`(?<=\\p{Nd}[${SPACE}]*[\\p{L}/]*)`, "uy");
+// Digits at the start of the text or after a space, before lastIndex: an ordinal ("3. de maio").
+const BARE_NUMBER_BEFORE = new RegExp(`(?<=(?:^|[${SPACE}])\\p{Nd}+)`, "uy");
+// quebra_frases `_LATIN_WORD`, `_VOWELS`, `_ABBREVIATIONS`, `_UNITS`, `_CAPITAL_ABBREVIATIONS`
+// and `_ROMAN_NUMERAL`. The module docstring of quebra_frases cites the source of each unit.
+const LATIN_WORD = /^[\p{Script=Latin}']+$/u;
+const VOWELS = new Set(
+  "aeiouyAEIOUY" +
+    "ÆØæøıĲĳŒœƆƎƏƐƖƗƟƱǝȢȣȺɄɆɇɎɏɐɑ" +
+    "ɒɔɘəɚɛɜɝɞɨɩɪɵɶɷʉʊʏʚᴀᴁᴂᴇᴈᴉᴏᴐᴑᴒᴓᴔ" +
+    "ᴕᴖᴗᴜᴝᴞᵫᵻᵼᵾᵿᶏᶐᶒᶓᶔᶕᶖᶗᶙẚỾỿⱥⱭⱯⱰⱸⱺⱻꜲꜳ" +
+    "ꜴꜵꜶꜷꜸꜹꜺꜻꜼꜽꝊꝋꝌꝍꝎꝏꞚꞛꞜꞝꞞꞟꞫꞮꞶꞷꞸꞹꞺꞻꞼꞽ" +
+    "ꞾꞿꟀꟁꟷꟾꬰꬱꬲꬳꬴꬽꬾꬿꭀꭁꭂꭃꭄꭎꭏꭐꭑꭒꭚꭡꭢꭣꭤﬁﬃＡ" +
+    "ＥＩＯＵＹａｅｉｏｕｙ𝼚𝼛",
+);
+const ABBREVIATIONS = new Set(["sra", "dra", "exmo", "exma", "etc", "ex", "pp", "vs", "av", "num"]);
+const UNITS = new Set([
+  "s", "kg", "cd", "Hz", "kHz", "MHz", "GHz", "kW", "pH",
+  "km", "cm", "mm", "nm", "dm", "g", "mg", "h", "l", "t", "dB",
+  "ml", "cl", "dl", "hl", "Wh", "kWh", "ft", "lb", "rpm", "cc",
+  "mph", "kph", "lbs", "kb", "Mb", "Gb", "kB",
+]);
+const CAPITAL_ABBREVIATIONS = new Set([
+  "MM", "SR", "SRA", "SRS", "SRAS", "DR", "DRA", "DRS",
+  "EXMO", "EXMA", "VS", "RR", "HH", "DD", "VV",
+]);
+const ROMAN_NUMERAL = /^(?=[IVXLCDM])M{0,3}(?:CM|CD|D?C{0,3})(?:XC|XL|L?X{0,3})(?:IX|IV|V?I{0,3})$/;
 // scriptconv `_CLAUSE_BREAK` and `_TRAILING_PUNCTUATION`. A match starts only where
 // a run of marks starts, so a long run is read once. Group 1 is the clause break.
 const MARK = `[^${WORD}${SPACE}]`;
@@ -47,8 +86,68 @@ const CHUNK_DELIMITERS = [":", ";", "...", "|"];
 const isAlpha = (ch: string | undefined) => ch !== undefined && /^\p{L}$/u.test(ch);
 const isDigit = (ch: string | undefined) => ch !== undefined && /^\p{Nd}$/u.test(ch);
 
+/** quebra_frases `_is_abbreviation`: a "." after `word` does not end the sentence. */
+function isAbbreviation(word: string): boolean {
+  if (!word) return false;
+  if (Array.from(word).length === 1) return true;
+  // Python `str.isupper`
+  if (/\p{Uppercase}/u.test(word) && !/[\p{Lowercase}\p{Lt}]/u.test(word)) {
+    return CAPITAL_ABBREVIATIONS.has(word);
+  }
+  if (LATIN_WORD.test(word) && !Array.from(word.normalize("NFD")).some((ch) => VOWELS.has(ch))) {
+    return true;
+  }
+  return ABBREVIATIONS.has(word.toLowerCase());
+}
+
+/** quebra_frases `sentence_tokenize`. */
 export function sentenceTokenize(text: string): string[] {
-  return text.split(SENTENCE_BREAK);
+  const sentences: string[] = [];
+  let last = 0;
+  for (const match of text.matchAll(SENTENCE_SPLIT_CANDIDATE)) {
+    const gap = match[1] ?? "";
+    const mark = match.index + match[0].length - gap.length;
+    let splitAt = mark;
+    let resume = mark + gap.length;
+    // A closing quote or bracket after the space ("« Òc ! » E") stays with the sentence, and a
+    // text that ends with it does not split there. A "»" that starts a line opens the next
+    // paragraph of a quote, so it stays where it is.
+    SPACED_CLOSE.lastIndex = resume;
+    const closing = SPACED_CLOSE.exec(text);
+    if (closing && !LINE_BREAK.test(gap)) {
+      const end = closing.index + closing[0].length;
+      if (end === text.length) continue;
+      resume = end;
+      splitAt = end - closing[1].length;
+    }
+    const codePoint = text.codePointAt(resume);
+    const next = codePoint === undefined ? "" : String.fromCodePoint(codePoint);
+    // Python `next.islower() and next != next.title()`. Title case leaves Georgian Mkhedruli
+    // (U+10D0 to U+10FF) unchanged, and a Georgian sentence starts with it.
+    const goesOn =
+      /^\p{Lowercase}$/u.test(next) && next.toUpperCase() !== next && !/[\u10d0-\u10ff]/.test(next);
+    // "Yahoo! and Microsoft", "¡Ay! dijo él"
+    if (text[mark - 1] === "!" && goesOn) continue;
+    if (text[mark - 1] === ".") {
+      WORD_BEFORE.lastIndex = mark - 1;
+      const word = WORD_BEFORE.exec(text)![1];
+      if (isAbbreviation(word)) {
+        // A unit after a number ends the sentence ("3 kg."), unless the next word goes on in
+        // lower case or a one-letter unit starts a dotted abbreviation ("3 s. S. 45").
+        NUMBER_BEFORE.lastIndex = mark - 1 - word.length;
+        const unit = UNITS.has(word) && NUMBER_BEFORE.test(text);
+        const dotted = Array.from(word).length === 1 && isAlpha(next) && text[resume + next.length] === ".";
+        if (!unit || dotted || goesOn) continue;
+      }
+      // An ordinal ("3. de maio", "XIV. acabou") goes on before a lowercase word.
+      BARE_NUMBER_BEFORE.lastIndex = mark - 1;
+      if (goesOn && (BARE_NUMBER_BEFORE.test(text) || ROMAN_NUMERAL.test(word))) continue;
+    }
+    sentences.push(text.slice(last, splitAt));
+    last = resume;
+  }
+  sentences.push(text.slice(last));
+  return sentences;
 }
 
 /** `BasePhonemizer._between_letters`: the character at `index` stands between two letters. */
