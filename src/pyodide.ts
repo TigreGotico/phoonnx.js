@@ -25,7 +25,7 @@ import type {
 } from "./types.js";
 import { fetchCached } from "./cache.js";
 import { createSession } from "./voice.js";
-import { flattenIdMap } from "./tokenize.js";
+import { voiceIdMap } from "./tokenize.js";
 import frontendSource from "./python/frontend.py";
 
 /** Pyodide release the front end is tested with. */
@@ -352,7 +352,7 @@ export async function loadIndexVoice(
     },
     session,
     config,
-    idMap: flattenIdMap(config.phoneme_id_map),
+    idMap: voiceIdMap(config),
     sampleRate: info.sample_rate,
     provider,
     tokenize: (text: string) => py.textToIds(entry.voice_id, text),

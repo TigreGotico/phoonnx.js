@@ -10,7 +10,7 @@ import type {
   Tokenizer,
 } from "./types.js";
 import { fetchCached } from "./cache.js";
-import { flattenIdMap, keepsPunctuation, singleId, tokenizeUnicode } from "./tokenize.js";
+import { keepsPunctuation, singleId, tokenizeUnicode, voiceIdMap } from "./tokenize.js";
 import { encodeWav, reconstructAlignments } from "./audio.js";
 import {
   DEFAULT_SUPER_RESOLUTION_MODEL,
@@ -189,7 +189,7 @@ export async function loadVoice(
     entry,
     session,
     config,
-    idMap: flattenIdMap(config.phoneme_id_map),
+    idMap: voiceIdMap(config),
     keepPunctuation: keepsPunctuation(config),
     sampleRate: config.audio?.sample_rate ?? config.sample_rate ?? entry.sampleRate,
     provider,

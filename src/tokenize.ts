@@ -101,15 +101,11 @@ export async function tokenizeUnicode(
 }
 
 /**
- * Whether a voice keeps clause punctuation, as Python phoonnx reads the config:
- * the `keep_punctuation` key when there is one. A piper config, which has no
- * `phoonnx_version`, keeps it unless phoonnx wrote it (a `piper_version` that
- * starts with "phoonnx", or an `alphabet` key). Any other config does not.
+ * Whether Piper trained the voice: a piper config, which has no `phoonnx_version`,
+ * that phoonnx did not write (a `piper_version` that starts with "phoonnx", or an
+ * `alphabet` key), as Python phoonnx reads it.
  */
-export function keepsPunctuation(config: VoiceConfig): boolean {
-  if (config.keep_punctuation !== undefined && config.keep_punctuation !== null) {
-    return Boolean(config.keep_punctuation);
-  }
+export function trainedByPiper(config: VoiceConfig): boolean {
   if ("phoonnx_version" in config) return false;
   const map = config.phoneme_id_map;
   const pipershaped =
@@ -120,4 +116,34 @@ export function keepsPunctuation(config: VoiceConfig): boolean {
       Object.values(map).every(Array.isArray));
   if (!pipershaped) return false;
   return !(String(config.piper_version ?? "").startsWith("phoonnx") || "alphabet" in config);
+}
+
+/**
+ * Whether a voice keeps clause punctuation, as Python phoonnx reads the config:
+ * the `keep_punctuation` key when there is one, else whether Piper trained it.
+ */
+export function keepsPunctuation(config: VoiceConfig): boolean {
+  if (config.keep_punctuation !== undefined && config.keep_punctuation !== null) {
+    return Boolean(config.keep_punctuation);
+  }
+  return trainedByPiper(config);
+}
+
+/**
+ * The id map of a voice, as Python phoonnx reads it. Piper decomposes the
+ * espeak-ng phonemes (NFD) before the id lookup, so "ç" reaches a voice it
+ * trained as "c" and U+0327, and the own id of "ç" is never trained
+ * (piper1-gpl src/piper/phonemize_espeak.py at v1.5.0). For such a voice a
+ * precomposed symbol reads as the ids of its parts that the map holds.
+ */
+export function voiceIdMap(config: VoiceConfig): IdMap {
+  const idMap = flattenIdMap(config.phoneme_id_map);
+  if (!trainedByPiper(config)) return idMap;
+  for (const symbol of Object.keys(idMap)) {
+    const parts = Array.from(symbol.normalize("NFD"));
+    if (parts.join("") === symbol) continue;
+    idMap[symbol] = parts.filter((part) => part in config.phoneme_id_map)
+      .flatMap((part) => config.phoneme_id_map[part]);
+  }
+  return idMap;
 }
