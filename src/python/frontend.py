@@ -62,36 +62,25 @@ if isinstance(_hub_errors, _StubModule):
     for _name in ("EntryNotFoundError", "LocalEntryNotFoundError", "OfflineModeIsEnabled"):
         setattr(_hub_errors, _name, type(_name, (Exception,), {}))
 
-from phoonnx import model_manager, voice as voice_module  # noqa: E402
-from phoonnx.engines import get_adapter  # noqa: E402
+from phoonnx import model_manager  # noqa: E402
+from phoonnx.runtime import Runtime  # noqa: E402
 
+# phoonnx.js runs the graphs in onnxruntime-web, so this module opens none.
 _GRAPH = Path("/phoonnx-js/model.onnx")
 _files: dict = {}
 _voices: dict = {}
 
 
-def _resolve(url: str, timeout: int = 120) -> Path:
-    try:
+def _fetch(url: str) -> Path:
+    """The file phoonnx.js downloaded for ``url``. A graph needs no file here."""
+    if url in _files:
         return Path(_files[url])
-    except KeyError:
-        raise FileNotFoundError(f"phoonnx.js did not provide {url}") from None
+    if url.split("?")[0].endswith(".onnx"):
+        return _GRAPH
+    raise FileNotFoundError(f"phoonnx.js did not provide {url}")
 
 
-def _no_session(*args, **kwargs):
-    return None
-
-
-def _vits_adapter(*args, **kwargs):
-    # phoonnx.js runs single-graph VITS models only; the adapter builds no
-    # token ids, so its choice does not change them.
-    return get_adapter("vits")
-
-
-model_manager._resolve = _resolve
-model_manager.TTSModelInfo._fetch_onnx = lambda self, url: _GRAPH
-model_manager.make_session = _no_session
-voice_module.make_session = _no_session
-voice_module.detect_engine = _vits_adapter
+_RUNTIME = Runtime(fetch=_fetch, open_session=lambda *args, **kwargs: None)
 
 
 def load_voice(key: str, entry: dict, files: dict) -> dict:
@@ -102,7 +91,7 @@ def load_voice(key: str, entry: dict, files: dict) -> dict:
     """
     _files.update(files)
     info = model_manager.TTSModelInfo(**entry)
-    voice = info.load()
+    voice = info.load(runtime=_RUNTIME)
     _voices[key] = voice
     config = voice.config
     return {
