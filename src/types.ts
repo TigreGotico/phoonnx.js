@@ -52,12 +52,15 @@ export interface VoiceConfig {
 }
 
 /** A fully loaded voice, ready to synthesize. */
+/** Symbol to token id. A symbol that reads as several ids, such as a precomposed letter, maps to all of them. */
+export type IdMap = Record<string, number | number[]>;
+
 export interface LoadedVoice {
   entry: VoiceEntry;
   session: ort.InferenceSession;
   config: VoiceConfig;
-  /** phoneme_id_map flattened to char → int (piper uses [id], phoonnx uses id). */
-  idMap: Record<string, number>;
+  /** phoneme_id_map with a one-id list read as that id. */
+  idMap: IdMap;
   sampleRate: number;
   /** "webgpu" if the GPU backend was available, "wasm" otherwise. */
   provider: string;
@@ -79,7 +82,7 @@ export interface LoadedVoice {
  */
 export type Tokenizer = (
   text: string,
-  idMap: Record<string, number>,
+  idMap: IdMap,
 ) => number[] | number[][] | Promise<number[] | number[][]>;
 
 /** One voice of Python phoonnx's voice index (`phoonnx/voice_index/*.json`). */

@@ -30,6 +30,7 @@
 
 import { phonemeSentences, type ReadClauses } from "./frontend.js";
 import { symbolsToIds, type TokenizeOptions } from "./tokenize.js";
+import type { IdMap } from "./types.js";
 
 type EspeakFactory = (opts: {
   arguments: string[];
@@ -50,13 +51,13 @@ export function makeEspeakTokenizer(
   wasmUrl: string,
 ): (
   text: string,
-  idMap: Record<string, number>,
+  idMap: IdMap,
   espeakVoice?: string,
   options?: TokenizeOptions,
 ) => Promise<number[][]> {
   return async (
     text: string,
-    idMap: Record<string, number>,
+    idMap: IdMap,
     espeakVoice?: string,
     options?: TokenizeOptions,
   ) => {
@@ -83,7 +84,7 @@ export function makeEspeakTokenizer(
 export async function tokenizeEspeak(
   text: string,
   espeakVoice: string,
-  idMap: Record<string, number>,
+  idMap: IdMap,
   espeakFactory: EspeakFactory,
   wasmUrl: string,
   options: TokenizeOptions = {},

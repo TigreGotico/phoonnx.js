@@ -10,7 +10,7 @@ import type {
   Tokenizer,
 } from "./types.js";
 import { fetchCached } from "./cache.js";
-import { flattenIdMap, keepsPunctuation, tokenizeUnicode } from "./tokenize.js";
+import { flattenIdMap, keepsPunctuation, singleId, tokenizeUnicode } from "./tokenize.js";
 import { encodeWav, reconstructAlignments } from "./audio.js";
 import {
   DEFAULT_SUPER_RESOLUTION_MODEL,
@@ -290,11 +290,11 @@ export async function synthesize(
 
       // Build reverse id map from the voice's phoneme_id_map.
       const idxToChar = new Map<number, string>();
-      for (const [ch, id] of Object.entries(voice.idMap)) idxToChar.set(id, ch);
+      for (const [ch, id] of Object.entries(voice.idMap)) if (typeof id === "number") idxToChar.set(id, ch);
 
-      const blankId = voice.idMap["_"] ?? 0;
-      const bosId = voice.idMap["^"] ?? 1;
-      const eosId = voice.idMap["$"] ?? 2;
+      const blankId = singleId(voice.idMap, "_", 0);
+      const bosId = singleId(voice.idMap, "^", 1);
+      const eosId = singleId(voice.idMap, "$", 2);
 
       const raw = reconstructAlignments(
         ids, rawDurations, hopLength, idxToChar, blankId, bosId, eosId,

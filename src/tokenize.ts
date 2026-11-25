@@ -1,5 +1,5 @@
 import { phonemeSentences } from "./frontend.js";
-import type { VoiceConfig } from "./types.js";
+import type { IdMap, VoiceConfig } from "./types.js";
 
 /** How the tokenizers read a voice's text. */
 export interface TokenizeOptions {
@@ -12,15 +12,20 @@ export interface TokenizeOptions {
 }
 
 /**
- * Normalize a phoneme_id_map to char → int.
- * piper uses `{ "a": [14] }`, phoonnx uses `{ "a": 14 }`.
+ * A phoneme_id_map as the tokenizers read it, as Python phoonnx reads it: a list
+ * of one id gives that id, and a longer list keeps every id. Piper writes
+ * `{ "a": [14] }`, and phoonnx writes `{ "a": 14 }` or `{ "ç": [16, 140] }`.
  */
-export function flattenIdMap(
-  m: Record<string, number | number[]>,
-): Record<string, number> {
-  const out: Record<string, number> = {};
-  for (const [k, v] of Object.entries(m)) out[k] = Array.isArray(v) ? v[0] : v;
+export function flattenIdMap(m: IdMap): IdMap {
+  const out: IdMap = {};
+  for (const [k, v] of Object.entries(m)) out[k] = Array.isArray(v) && v.length === 1 ? v[0] : v;
   return out;
+}
+
+/** The id of a single-id symbol such as the blank, or `fallback`. */
+export function singleId(idMap: IdMap, symbol: string, fallback: number): number {
+  const id = idMap[symbol];
+  return typeof id === "number" ? id : fallback;
 }
 
 /**
@@ -30,10 +35,10 @@ export function flattenIdMap(
  * Multi-character map keys fold adjacent symbols, longest key first. A blank
  * id goes between the ids, and BOS and EOS wrap them.
  */
-export function symbolsToIds(symbols: string[], idMap: Record<string, number>): number[] {
-  const blank = idMap["_"] ?? 0;
-  const bos = idMap["^"] ?? 1;
-  const eos = idMap["$"] ?? 2;
+export function symbolsToIds(symbols: string[], idMap: IdMap): number[] {
+  const blank = singleId(idMap, "_", 0);
+  const bos = singleId(idMap, "^", 1);
+  const eos = singleId(idMap, "$", 2);
   const compounds = Object.keys(idMap)
     .map((key) => Array.from(key))
     .filter((chars) => chars.length > 1)
@@ -55,7 +60,7 @@ export function symbolsToIds(symbols: string[], idMap: Record<string, number>): 
     if (id === undefined && Array.from(symbol).length === 1) {
       const parts = Array.from(symbol.normalize("NFD"));
       if (parts.length > 1 && parts.every((part) => part in idMap)) {
-        id = parts.map((part) => idMap[part]);
+        id = parts.flatMap((part) => idMap[part]);
       }
     }
     if (id === undefined && Array.from(symbol).length === 1) {
@@ -84,7 +89,7 @@ export function symbolsToIds(symbols: string[], idMap: Record<string, number>): 
  */
 export async function tokenizeUnicode(
   text: string,
-  idMap: Record<string, number>,
+  idMap: IdMap,
   options: TokenizeOptions = {},
 ): Promise<number[][]> {
   const sentences = await phonemeSentences(
