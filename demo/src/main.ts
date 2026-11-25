@@ -1,5 +1,5 @@
 import "./style.css";
-import { loadVoice, synthesize, encodeWav, type LoadedVoice } from "phoonnx";
+import { loadVoice, synthesize, encodeWav, type IdMap, type LoadedVoice } from "phoonnx";
 import { voices, type VoiceEntry } from "phoonnx/voices";
 import { makeEspeakTokenizer } from "phoonnx/espeak";
 // @ts-expect-error — emscripten module ships no types
@@ -99,7 +99,7 @@ btn.addEventListener("click", async () => {
     status.textContent = "synthesizing…";
     const tokenize =
       entry.phonemeType === "espeak"
-        ? (t: string, idMap: Record<string, number>) =>
+        ? (t: string, idMap: IdMap) =>
             espeakTokenize(t, idMap, entry.espeakVoice ?? undefined, {
               keepPunctuation: loaded!.keepPunctuation,
             })

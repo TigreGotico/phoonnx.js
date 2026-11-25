@@ -51,15 +51,15 @@ export interface VoiceConfig {
   sample_rate?: number;
 }
 
-/** A fully loaded voice, ready to synthesize. */
 /** Symbol to token id. A symbol that reads as several ids, such as a precomposed letter, maps to all of them. */
 export type IdMap = Record<string, number | number[]>;
 
+/** A fully loaded voice, ready to synthesize. */
 export interface LoadedVoice {
   entry: VoiceEntry;
   session: ort.InferenceSession;
   config: VoiceConfig;
-  /** phoneme_id_map with a one-id list read as that id. */
+  /** phoneme_id_map as the tokenizers read it (see voiceIdMap). */
   idMap: IdMap;
   sampleRate: number;
   /** "webgpu" if the GPU backend was available, "wasm" otherwise. */

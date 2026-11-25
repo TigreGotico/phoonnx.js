@@ -13,7 +13,7 @@ import { fileURLToPath } from "node:url";
 // @ts-expect-error espeak-ng ships no type declarations
 import espeakFactory from "espeak-ng";
 
-import { flattenIdMap, keepsPunctuation, tokenizeUnicode } from "../src/tokenize.ts";
+import { keepsPunctuation, tokenizeUnicode, voiceIdMap } from "../src/tokenize.ts";
 import { tokenizeEspeak } from "../src/espeak.ts";
 import type { VoiceConfig } from "../src/types.ts";
 import { loadIdParityFixture } from "./id_parity_fixture.mjs";
@@ -28,7 +28,7 @@ const fixture: { voices: Record<string, Voice>; rows: Row[] } = await loadIdPari
 async function idsOf(row: Row): Promise<number[][]> {
   const voice = fixture.voices[row.voice_id];
   const config = voice.files.config_url;
-  const idMap = flattenIdMap(config.phoneme_id_map);
+  const idMap = voiceIdMap(config);
   const options = { keepPunctuation: keepsPunctuation(config) };
   if (voice.phoneme_type === "unicode") return tokenizeUnicode(row.text, idMap, options);
   return tokenizeEspeak(row.text, voice.espeak_voice!, idMap, espeakFactory, wasm, options);
