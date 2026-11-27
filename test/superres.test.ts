@@ -44,7 +44,7 @@ test("availableSuperResolutionEngines exposes all four engines with metadata", (
   );
   // every engine outputs 48 kHz and names its HF repo + approx size
   for (const e of engines) {
-    assert.match(e.repo, /^TigreGotico\/audiosronnx-/);
+    assert.match(e.repo, /^AudioSRonnx\//);
     assert.equal(typeof e.approxMB, "number");
     assert.ok(e.description.length > 0);
     assert.equal(e.revision.length, 40); // pinned git sha

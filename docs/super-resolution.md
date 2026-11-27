@@ -38,10 +38,10 @@ console.log("unknown engine:", unknown.sampleRate, "Hz");
 ```
 
 ```text
-lavasr 52 MB TigreGotico/audiosronnx-lavasr
-novasr 0.05 MB TigreGotico/audiosronnx-novasr
-hifiganbwe 4 MB TigreGotico/audiosronnx-hifiganbwe
-apbwe 120 MB TigreGotico/audiosronnx-apbwe
+lavasr 52 MB AudioSRonnx/lavasr
+novasr 0.05 MB AudioSRonnx/novasr
+hifiganbwe 4 MB AudioSRonnx/hifiganbwe
+apbwe 120 MB AudioSRonnx/apbwe
 native: 22050 Hz
 upscaled: 48000 Hz
 [phoonnx] unknown super-resolution engine "nosuchengine"; known: lavasr, novasr, hifiganbwe, apbwe. Falling back to native audio.

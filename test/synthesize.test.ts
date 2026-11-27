@@ -124,7 +124,7 @@ test("super-resolution engine loads once per voice over several calls", async (t
   assert.equal(create.mock.callCount(), 1);
   assert.equal(inputs.length, 6);
   const url = String(fetch.mock.calls[0].arguments[0]);
-  assert.match(url, /TigreGotico\/audiosronnx-novasr\/resolve\/[0-9a-f]{40}\/novasr\.onnx$/);
+  assert.match(url, /AudioSRonnx\/novasr\/resolve\/[0-9a-f]{40}\/novasr\.onnx$/);
 });
 
 test("super-resolution failure on one sentence gives native audio for the whole text", async (t) => {

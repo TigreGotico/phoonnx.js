@@ -66,28 +66,28 @@ interface EngineMeta {
 
 const ENGINES: Record<SuperResolutionEngine, EngineMeta> = {
   lavasr: {
-    repo: "TigreGotico/audiosronnx-lavasr",
+    repo: "AudioSRonnx/lavasr",
     revision: "b3df8a262cf44e59bf84a40b7084f4479ca566b4",
     files: ["backbone.onnx", "spec_head.onnx"], // denoiser fetched only when denoise=true
     approxMB: 52,
     description: "LavaSR: Vocos bandwidth extension + spectral merge. Any 8-48 kHz -> 48 kHz.",
   },
   novasr: {
-    repo: "TigreGotico/audiosronnx-novasr",
+    repo: "AudioSRonnx/novasr",
     revision: "5d92bf1488aae6d92356ef5951c7ef9bf9f9801b",
     files: ["novasr.onnx"],
     approxMB: 0.05,
     description: "NovaSR: tiny conv1d generator, 16 kHz -> 48 kHz. Lightest; browser-friendly.",
   },
   hifiganbwe: {
-    repo: "TigreGotico/audiosronnx-hifiganbwe",
+    repo: "AudioSRonnx/hifiganbwe",
     revision: "d617931bce0671703b0ac0fbe14cf37d243e5f8c",
     files: ["hifiganbwe_wavenet.onnx"],
     approxMB: 4,
     description: "HiFi-GAN+: WaveNet bandwidth extension, any input -> 48 kHz.",
   },
   apbwe: {
-    repo: "TigreGotico/audiosronnx-apbwe",
+    repo: "AudioSRonnx/apbwe",
     revision: "22d116972f09802273d9e26851f004da0bfbd58a",
     files: ["apbwe.onnx"],
     approxMB: 120,
